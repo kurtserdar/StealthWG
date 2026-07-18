@@ -75,6 +75,29 @@ not run in the Simulator), and the wireguard-go bridge builds for `iphoneos` onl
 cd gateway && go test ./... && go build ./cmd/stealthwg-gateway
 ```
 
+### Profile format
+
+The app imports a standard wg-quick config with a StealthWG `[Stealth]` section.
+`[Peer] Endpoint` points at the gateway's mask port; `MaskKey` is the shared
+obfuscation PSK (base64), the same key the gateway runs with.
+
+```ini
+[Interface]
+PrivateKey = <client private key>
+Address = 10.0.0.2/32
+
+[Peer]
+PublicKey = <server public key>
+Endpoint = <gateway public IP>:51819
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25
+
+[Stealth]
+MaskKey = <base64 PSK>
+```
+
+Run the parser tests with `./scripts/test-parser.sh`.
+
 ## Design principles
 
 - **Privacy by design.** No logging of user traffic. Keys never leave the device.

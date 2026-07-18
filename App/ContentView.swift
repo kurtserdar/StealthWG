@@ -3,15 +3,29 @@ import NetworkExtension
 
 struct ContentView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
+    @State private var profileText = ""
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             Text("StealthWG")
                 .font(.largeTitle.bold())
 
             statusBadge
 
+            profileEditor
+
+            HStack {
+                Button("Import profile") {
+                    Task { await tunnelManager.importProfile(profileText) }
+                }
+                .buttonStyle(.bordered)
+                .disabled(profileText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Spacer()
+            }
+
             connectButton
+                .disabled(!tunnelManager.hasProfile)
 
             if let error = tunnelManager.lastError {
                 Text(error)
@@ -19,6 +33,8 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
             }
+
+            Spacer()
         }
         .padding()
     }
@@ -33,14 +49,27 @@ struct ContentView: View {
         }
     }
 
+    private var profileEditor: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Profile (.conf with a [Stealth] section)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextEditor(text: $profileText)
+                .font(.system(.footnote, design: .monospaced))
+                .frame(height: 200)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(.secondary.opacity(0.3))
+                )
+        }
+    }
+
     private var connectButton: some View {
         Button {
-            Task {
-                if isActive {
-                    tunnelManager.disconnect()
-                } else {
-                    await tunnelManager.connect()
-                }
+            if isActive {
+                tunnelManager.disconnect()
+            } else {
+                tunnelManager.connect()
             }
         } label: {
             Text(isActive ? "Disconnect" : "Connect")

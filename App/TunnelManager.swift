@@ -3,13 +3,14 @@ import NetworkExtension
 
 /// Observable wrapper around `NETunnelProviderManager` that the UI binds to.
 ///
-/// For now this only installs/loads the VPN configuration and starts or stops
-/// the tunnel. The actual WireGuard configuration is wired in a later step;
-/// today the extension is a stub that brings the interface up and idles.
+/// The app parses a pasted StealthWG profile, stores the wg-quick config and the
+/// mask key in the tunnel's provider configuration, and starts/stops the tunnel.
+/// The packet tunnel extension reads that configuration and drives WireGuard.
 @MainActor
 final class TunnelManager: ObservableObject {
     @Published private(set) var status: NEVPNStatus = .invalid
     @Published private(set) var lastError: String?
+    @Published private(set) var hasProfile = false
 
     private var manager: NETunnelProviderManager?
     private var statusObserver: NSObjectProtocol?
@@ -20,6 +21,7 @@ final class TunnelManager: ObservableObject {
             let managers = try await NETunnelProviderManager.loadAllFromPreferences()
             let manager = managers.first ?? NETunnelProviderManager()
             self.manager = manager
+            hasProfile = profileIsPresent(in: manager)
             observeStatus(of: manager)
             status = manager.connection.status
         } catch {
@@ -27,17 +29,21 @@ final class TunnelManager: ObservableObject {
         }
     }
 
-    /// Create or update the tunnel configuration and start the connection.
-    func connect() async {
+    /// Parse a pasted StealthWG profile and save it as the tunnel configuration.
+    func importProfile(_ raw: String) async {
         do {
-            let manager = self.manager ?? NETunnelProviderManager()
+            let profile = try StealthProfile.parse(raw)
 
             let proto = NETunnelProviderProtocol()
             proto.providerBundleIdentifier = TunnelConstants.tunnelBundleIdentifier
-            // Placeholder until a real profile is imported. The tunnel needs a
-            // server address to be considered valid by the system.
-            proto.serverAddress = "StealthWG"
+            proto.serverAddress = TunnelConstants.displayName
+            var providerConfiguration: [String: Any] = ["wgQuickConfig": profile.wgQuickConfig]
+            if let maskKey = profile.maskKey {
+                providerConfiguration["maskKey"] = maskKey
+            }
+            proto.providerConfiguration = providerConfiguration
 
+            let manager = self.manager ?? NETunnelProviderManager()
             manager.protocolConfiguration = proto
             manager.localizedDescription = TunnelConstants.displayName
             manager.isEnabled = true
@@ -48,8 +54,17 @@ final class TunnelManager: ObservableObject {
 
             self.manager = manager
             observeStatus(of: manager)
+            hasProfile = true
+            lastError = nil
+        } catch {
+            lastError = describe(error)
+        }
+    }
 
-            try manager.connection.startVPNTunnel()
+    /// Start the tunnel using the saved profile.
+    func connect() {
+        do {
+            try manager?.connection.startVPNTunnel()
             lastError = nil
         } catch {
             lastError = error.localizedDescription
@@ -59,6 +74,18 @@ final class TunnelManager: ObservableObject {
     /// Stop the active tunnel connection.
     func disconnect() {
         manager?.connection.stopVPNTunnel()
+    }
+
+    private func profileIsPresent(in manager: NETunnelProviderManager) -> Bool {
+        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+        return proto?.providerConfiguration?["wgQuickConfig"] != nil
+    }
+
+    private func describe(_ error: Error) -> String {
+        if case StealthProfile.ParseError.emptyConfiguration = error {
+            return "The profile is empty or missing an [Interface] section."
+        }
+        return error.localizedDescription
     }
 
     private func observeStatus(of manager: NETunnelProviderManager) {

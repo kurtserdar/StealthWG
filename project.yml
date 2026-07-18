@@ -63,6 +63,9 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Tunnel/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: StealthWG Tunnel
+        # Exposes wgSetStealthKey (a C symbol from libwg-go.a) to the extension's
+        # Swift without importing the internal WireGuardKitGo module.
+        SWIFT_OBJC_BRIDGING_HEADER: Tunnel/StealthBridge.h
     dependencies:
       - package: WireGuardKit
         product: WireGuardKit
