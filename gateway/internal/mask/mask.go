@@ -6,10 +6,12 @@
 package mask
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"io"
+	"math/big"
 
 	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/hkdf"
@@ -107,4 +109,31 @@ func (c *Codec) Open(datagram []byte) ([]byte, error) {
 	out := make([]byte, plen)
 	copy(out, pt[lenPrefix:lenPrefix+plen])
 	return out, nil
+}
+
+// Seal masks a wg packet with a fresh random nonce and random padding. This is
+// the production path; MaskWith is the deterministic core it delegates to.
+func (c *Codec) Seal(wg []byte) ([]byte, error) {
+	if len(wg) > maxWGPacket {
+		return nil, ErrTooLong
+	}
+	nonce := make([]byte, NonceSize)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	padLen := 0
+	if c.padMax > 0 {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(c.padMax+1)))
+		if err != nil {
+			return nil, err
+		}
+		padLen = int(n.Int64())
+	}
+	pad := make([]byte, padLen)
+	if padLen > 0 {
+		if _, err := rand.Read(pad); err != nil {
+			return nil, err
+		}
+	}
+	return c.MaskWith(nonce, wg, pad)
 }
