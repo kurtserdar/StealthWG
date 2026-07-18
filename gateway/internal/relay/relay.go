@@ -6,12 +6,19 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/kurtserdar/StealthWG/gateway/internal/mask"
 )
+
+// maxSessions bounds the session table so unauthenticated traffic cannot force
+// unbounded socket/goroutine growth. Open() is not authentication (no MAC), so
+// admission cannot be PSK-gated; a hard cap keeps the gateway alive under a
+// flood. Per-source throttling is deferred future hardening.
+const maxSessions = 1024
 
 type session struct {
 	clientAddr *net.UDPAddr
@@ -28,10 +35,14 @@ type Relay struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+	closed   bool
 }
 
 // New binds the listen socket and resolves the upstream address.
 func New(listenAddr, upstreamAddr string, codec *mask.Codec, timeout time.Duration) (*Relay, error) {
+	if timeout <= 0 {
+		return nil, errors.New("relay: timeout must be positive")
+	}
 	lAddr, err := net.ResolveUDPAddr("udp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -60,12 +71,14 @@ func (r *Relay) LocalAddr() net.Addr { return r.listen.LocalAddr() }
 func (r *Relay) Run(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
-		r.listen.Close()
 		r.mu.Lock()
-		for _, s := range r.sessions {
+		r.closed = true
+		for key, s := range r.sessions {
 			s.upstream.Close()
+			delete(r.sessions, key)
 		}
 		r.mu.Unlock()
+		r.listen.Close()
 	}()
 	go r.gcLoop(ctx)
 
@@ -97,8 +110,14 @@ func (r *Relay) getOrCreate(clientAddr *net.UDPAddr) *session {
 	key := clientAddr.String()
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.closed {
+		return nil
+	}
 	if s, ok := r.sessions[key]; ok {
 		return s
+	}
+	if len(r.sessions) >= maxSessions {
+		return nil
 	}
 	up, err := net.DialUDP("udp", nil, r.upstream)
 	if err != nil {

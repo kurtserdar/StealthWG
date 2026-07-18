@@ -102,3 +102,13 @@ func TestRelayDropsGarbageSilently(t *testing.T) {
 		t.Fatal("expected no reply to garbage, got one")
 	}
 }
+
+func TestNewRejectsNonPositiveTimeout(t *testing.T) {
+	codec, err := mask.NewCodec([]byte("relay-test-psk-000000000"), 32)
+	if err != nil {
+		t.Fatalf("NewCodec: %v", err)
+	}
+	if _, err := New("127.0.0.1:0", "127.0.0.1:51820", codec, 0); err == nil {
+		t.Fatal("expected error for zero timeout")
+	}
+}
