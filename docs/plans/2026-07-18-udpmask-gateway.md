@@ -6,12 +6,13 @@
 
 **Architecture:** A `mask` package implements the wire format (ChaCha20 keystream keyed by `HKDF-SHA256(PSK)`, random nonce + random padding, no MAC). A `relay` package is a NAT-like UDP relay: it opens a per-client upstream socket, unmasks client→upstream traffic and masks upstream→client replies, and garbage-collects idle sessions. A thin `cmd` wires flags into codec + relay under a signal-cancelled context.
 
-**Tech Stack:** Go 1.22+, `golang.org/x/crypto/chacha20`, `golang.org/x/crypto/hkdf`, standard `net`/`crypto/rand`.
+**Tech Stack:** Go 1.25+ (floor set by `golang.org/x/crypto`), `golang.org/x/crypto/chacha20`, `golang.org/x/crypto/hkdf`, standard `net`/`crypto/rand`.
 
 ## Global Constraints
 
 - All code comments in English.
 - Go module path: `github.com/kurtserdar/StealthWG/gateway`; module rooted at `gateway/`.
+- The `go` directive tracks the minor floor required by dependencies (currently `go 1.25.0` for `golang.org/x/crypto`); never pin an exact patch version (e.g. `1.26.5`).
 - Wire format is authoritative in `docs/design/2026-07-18-udpmask-transport.md`; do not deviate.
 - Key derivation: `HKDF-SHA256(ikm = PSK, salt = nil, info = "stealthwg/udpmask/v1")` → 32-byte key. Protocol version lives only in the `info` string — **no version byte on the wire**.
 - Datagram layout: `nonce(12) ‖ ChaCha20_keystream ⊕ ( plen(2, big-endian) ‖ wg_packet ‖ pad )`.
