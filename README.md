@@ -23,9 +23,9 @@ All cryptographic security is still provided by WireGuard itself.
 
 Standard WireGuard is easy for a network operator to recognize: its handshake
 packets have a fixed shape — a message-type byte followed by reserved zero bytes,
-plus fixed 148/92-byte handshake sizes. Some mobile carriers and ISPs use exactly
-this signature to block WireGuard on **every** port, so the tunnel never connects,
-no matter how you configure it — while ordinary UDP keeps flowing.
+plus fixed 148/92-byte handshake sizes. Both fixed-line ISPs and mobile carriers
+use exactly this signature to block WireGuard on **every** port, so the tunnel
+never connects, no matter how you configure it — while ordinary UDP keeps flowing.
 
 StealthWG was built for that situation. It reshapes every packet into
 high-entropy, variable-length noise, so the operator sees no recognizable
@@ -63,7 +63,7 @@ Planned implementations: `PlainUDPTransport`, `UdpMaskTransport`, and later
 ### First milestone — reached ✅
 
 A successful WireGuard handshake from the app on a physical iPhone (over mobile
-data) to a WireGuard endpoint behind a home gateway, on a carrier that blocks
+data) to a WireGuard endpoint behind a home gateway, on a network that blocks
 plain WireGuard. Reached: masked handshake plus live traffic (internet and LAN).
 The concept is validated end-to-end.
 
@@ -125,8 +125,8 @@ Run the parser tests with `./scripts/test-parser.sh`.
 ## Status
 
 Proof of concept complete — masked WireGuard validated end-to-end (handshake and
-live traffic) on a physical iPhone over a mobile carrier that blocks plain
-WireGuard. Hardening and productization are ongoing.
+live traffic) on a physical iPhone over a network that blocks plain WireGuard.
+Hardening and productization are ongoing.
 
 ## License
 
@@ -160,16 +160,16 @@ izlerini bozar. Tüm kriptografik güvenliği yine WireGuard'ın kendisi sağlar
 
 Standart WireGuard, bir ağ operatörü için tanınması kolaydır: el sıkışma
 (handshake) paketlerinin sabit bir deseni vardır — bir mesaj-tipi baytı, ardından
-sıfır baytlar, ve sabit 148/92 baytlık boyutlar. Bazı GSM operatörleri ve internet
-sağlayıcıları tam olarak bu parmak izini kullanıp WireGuard'ı **her portta**
-engeller; nasıl yapılandırırsan yapılandır tünel bir türlü kurulmaz — oysa sıradan
-UDP trafiği akmaya devam eder.
+sıfır baytlar, ve sabit 148/92 baytlık boyutlar. Hem sabit hat internet
+sağlayıcıları hem de GSM operatörleri tam olarak bu parmak izini kullanıp
+WireGuard'ı **her portta** engeller; nasıl yapılandırırsan yapılandır tünel bir
+türlü kurulmaz — oysa sıradan UDP trafiği akmaya devam eder.
 
 StealthWG tam da bunun için yazıldı. Her paketi yüksek entropili, değişken
 uzunlukta bir gürültüye dönüştürür; böylece operatör eşleştirebileceği tanıdık bir
 WireGuard deseni göremez — ama güvenliği yine WireGuard'ın kendisi sağlar. Pratikte
 doğrulandı: maskeli WireGuard, düz WireGuard'ı her portta engelleyen bir GSM
-operatörü üzerinden el sıkışmayı tamamladı ve canlı trafik taşıdı.
+operatörünün mobil verisi üzerinden el sıkışmayı tamamladı ve canlı trafik taşıdı.
 
 ## Mimari
 
@@ -200,9 +200,9 @@ Planlanan implementasyonlar: `PlainUDPTransport`, `UdpMaskTransport`, ve ileride
 ### İlk kilometre taşı — ulaşıldı ✅
 
 Fiziksel bir iPhone'dan (mobil veri üzerinden), düz WireGuard'ı engelleyen bir
-operatörde, ev ağ geçidinin arkasındaki bir WireGuard uç noktasına başarılı
-WireGuard el sıkışması. Ulaşıldı: maskeli el sıkışma + canlı trafik (internet ve
-LAN). Fikir uçtan uca doğrulandı.
+ağda, ev ağ geçidinin arkasındaki bir WireGuard uç noktasına başarılı WireGuard el
+sıkışması. Ulaşıldı: maskeli el sıkışma + canlı trafik (internet ve LAN). Fikir
+uçtan uca doğrulandı.
 
 ## Derleme
 
@@ -262,8 +262,8 @@ Parser testlerini `./scripts/test-parser.sh` ile çalıştır.
 ## Durum
 
 Kavram kanıtı (PoC) tamamlandı — maskeli WireGuard, düz WireGuard'ı engelleyen bir
-mobil operatör üzerinde fiziksel bir iPhone'da uçtan uca (el sıkışma ve canlı
-trafik) doğrulandı. Sertleştirme ve ürünleştirme sürüyor.
+ağ üzerinde fiziksel bir iPhone'da uçtan uca (el sıkışma ve canlı trafik)
+doğrulandı. Sertleştirme ve ürünleştirme sürüyor.
 
 ## Lisans
 
