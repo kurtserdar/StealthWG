@@ -1,0 +1,6 @@
+# Only the two Go modules are needed to build the gateway image.
+*
+!mask
+!gateway
+# Drop build artifacts that may exist in the working tree.
+gateway/stealthwg-gateway
