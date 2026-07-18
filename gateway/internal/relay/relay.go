@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kurtserdar/StealthWG/gateway/internal/mask"
+	"github.com/kurtserdar/StealthWG/mask"
 )
 
 // maxSessions bounds the session table so unauthenticated traffic cannot force

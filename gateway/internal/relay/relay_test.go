@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kurtserdar/StealthWG/gateway/internal/mask"
+	"github.com/kurtserdar/StealthWG/mask"
 )
 
 // startEchoUpstream stands in for the real WireGuard server: it echoes any

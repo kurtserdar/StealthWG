@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/kurtserdar/StealthWG/gateway/internal/config"
-	"github.com/kurtserdar/StealthWG/gateway/internal/mask"
+	"github.com/kurtserdar/StealthWG/mask"
 	"github.com/kurtserdar/StealthWG/gateway/internal/relay"
 )
 
