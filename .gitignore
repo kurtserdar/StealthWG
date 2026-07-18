@@ -1,0 +1,69 @@
+# ─── Secrets & sensitive material (public repo — NEVER commit) ───────────────
+# WireGuard keys & configs
+*.conf
+*.key
+*.pem
+wg-*.conf
+**/PrivateKey*
+**/private_key*
+secrets/
+*.env
+.env.*
+!.env.example
+
+# Apple provisioning & signing
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+*.certSigningRequest
+ExportOptions.plist
+
+# ─── Xcode ───────────────────────────────────────────────────────────────────
+## Build generated
+build/
+DerivedData/
+*.o
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## User settings / state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.perspectivev3
+!default.perspectivev3
+
+## Xcode workspace/scheme user data
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# ─── Swift Package Manager ───────────────────────────────────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# ─── Dependency managers (if ever used) ──────────────────────────────────────
+Pods/
+Carthage/Build/
+
+# ─── macOS ───────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# ─── Editor/tooling ──────────────────────────────────────────────────────────
+.idea/
+*.swp
+
+# ─── Claude Code local settings ──────────────────────────────────────────────
+.claude/settings.local.json
