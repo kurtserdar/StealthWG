@@ -49,6 +49,32 @@ A successful WireGuard handshake from the app on a physical iPhone (over mobile
 data) to a WireGuard endpoint behind a home gateway. That validates the concept
 end-to-end; UI, fallback, and containerized server gateway come after.
 
+## Building
+
+### iOS app
+
+The Xcode project is generated from `project.yml` with
+[XcodeGen](https://github.com/yonaskolb/XcodeGen), and the WireGuard engine is a
+pinned `wireguard-apple` submodule that needs a small patch set (Xcode-current
+build fixes today, the masking bind later).
+
+```sh
+brew install xcodegen go        # toolchain (Go builds the wireguard-go bridge)
+./scripts/setup-wireguard.sh    # init the submodule + apply patches (idempotent)
+cp Local.xcconfig.example Local.xcconfig   # then set your DEVELOPMENT_TEAM
+xcodegen generate
+open StealthWG.xcodeproj
+```
+
+The packet tunnel extension only runs on a physical device (Network Extensions do
+not run in the Simulator), and the wireguard-go bridge builds for `iphoneos` only.
+
+### Gateway
+
+```sh
+cd gateway && go test ./... && go build ./cmd/stealthwg-gateway
+```
+
 ## Design principles
 
 - **Privacy by design.** No logging of user traffic. Keys never leave the device.

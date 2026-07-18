@@ -18,7 +18,13 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1" # iPhone only
-    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # wireguard-go is built by a Makefile-driven script phase that writes outside
+    # Xcode's declared outputs, so user-script sandboxing must stay off.
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+packages:
+  WireGuardKit:
+    path: ThirdParty/wireguard-apple
 
 targets:
   # ── iOS application ────────────────────────────────────────────────────────
@@ -57,3 +63,16 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Tunnel/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: StealthWG Tunnel
+    dependencies:
+      - package: WireGuardKit
+        product: WireGuardKit
+    preBuildScripts:
+      - name: Build wireguard-go bridge
+        # Builds libwg-go.a into CONFIGURATION_BUILD_DIR so the extension link
+        # can resolve -lwg-go. The Makefile reads ARCHS/PLATFORM_NAME/SDKROOT and
+        # the build/temp dirs from Xcode's environment.
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          make -C "$SRCROOT/ThirdParty/wireguard-apple/Sources/WireGuardKitGo"

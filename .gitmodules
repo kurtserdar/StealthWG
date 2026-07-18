@@ -1,0 +1,3 @@
+[submodule "ThirdParty/wireguard-apple"]
+	path = ThirdParty/wireguard-apple
+	url = https://github.com/WireGuard/wireguard-apple.git
