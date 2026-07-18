@@ -1,5 +1,7 @@
 # StealthWG
 
+**English** · [Türkçe](#stealthwg-türkçe)
+
 An iOS WireGuard client with a pluggable **traffic obfuscation** transport layer,
 designed to keep working on networks that fingerprint and block standard
 WireGuard traffic via DPI (Deep Packet Inspection).
@@ -31,21 +33,6 @@ WireGuard pattern to match against — yet WireGuard itself still provides all t
 real security. This was validated in practice: masked WireGuard completed a
 handshake and carried live traffic over a mobile carrier that blocks plain
 WireGuard on every port.
-
-## Neden bu proje? (Türkçe)
-
-Standart WireGuard, bir ağ operatörü için tanınması kolaydır: el sıkışma (handshake)
-paketlerinin sabit bir deseni vardır — bir mesaj-tipi baytı, ardından sıfır baytlar,
-ve sabit 148/92 baytlık boyutlar. Bazı GSM operatörleri ve internet sağlayıcıları tam
-olarak bu parmak izini kullanıp WireGuard'ı **her portta** engeller; nasıl
-yapılandırırsan yapılandır tünel bir türlü kurulmaz — oysa sıradan UDP trafiği akmaya
-devam eder.
-
-StealthWG tam da bunun için yazıldı. Her paketi yüksek entropili, değişken uzunlukta
-bir gürültüye dönüştürür; böylece operatör eşleştirebileceği tanıdık bir WireGuard
-deseni göremez — ama güvenliği yine WireGuard'ın kendisi sağlar. Pratikte
-doğrulandı: maskeli WireGuard, düz WireGuard'ı her portta engelleyen bir GSM
-operatörü üzerinden el sıkışmayı tamamladı ve canlı trafik taşıdı.
 
 ## Architecture
 
@@ -144,3 +131,140 @@ WireGuard. Hardening and productization are ongoing.
 ## License
 
 [MIT](LICENSE). Built on the MIT-licensed WireGuard Apple project.
+
+---
+
+# StealthWG (Türkçe)
+
+[English](#stealthwg) · **Türkçe**
+
+Standart WireGuard trafiğini DPI (Derin Paket İncelemesi) ile parmak izinden
+tanıyıp engelleyen ağlarda çalışmaya devam etmek için tasarlanmış, **takılabilir
+bir trafik maskeleme (obfuscation)** taşıma katmanına sahip bir iOS WireGuard
+istemcisi.
+
+StealthWG, WireGuard'ı **yeniden yazmaz**. Resmi, MIT lisanslı
+[WireGuard Apple](https://github.com/WireGuard/wireguard-apple) motorunun
+(`WireGuardKit` + `wireguard-go`) üzerine kurulur ve WireGuard motoru ile ağ
+soketi arasına bir maskeleme katmanı yerleştirir.
+
+```
+Düz WireGuard:   WG motoru ──────────────────────► sunucu:51820
+StealthWG:       WG motoru ─► UdpMaskTransport ──► sunucu:51819 ─► maskeyi kaldır ─► WG:51820
+```
+
+Maskeleme yalnızca teldeki bayt desenini yeniden şekillendirerek DPI parmak
+izlerini bozar. Tüm kriptografik güvenliği yine WireGuard'ın kendisi sağlar.
+
+## Neden bu proje?
+
+Standart WireGuard, bir ağ operatörü için tanınması kolaydır: el sıkışma
+(handshake) paketlerinin sabit bir deseni vardır — bir mesaj-tipi baytı, ardından
+sıfır baytlar, ve sabit 148/92 baytlık boyutlar. Bazı GSM operatörleri ve internet
+sağlayıcıları tam olarak bu parmak izini kullanıp WireGuard'ı **her portta**
+engeller; nasıl yapılandırırsan yapılandır tünel bir türlü kurulmaz — oysa sıradan
+UDP trafiği akmaya devam eder.
+
+StealthWG tam da bunun için yazıldı. Her paketi yüksek entropili, değişken
+uzunlukta bir gürültüye dönüştürür; böylece operatör eşleştirebileceği tanıdık bir
+WireGuard deseni göremez — ama güvenliği yine WireGuard'ın kendisi sağlar. Pratikte
+doğrulandı: maskeli WireGuard, düz WireGuard'ı her portta engelleyen bir GSM
+operatörü üzerinden el sıkışmayı tamamladı ve canlı trafik taşıdı.
+
+## Mimari
+
+- **iOS Uygulaması** — profil yönetimi, WireGuard config içe aktarma, bağlan/kes, durum.
+- **PacketTunnel Uzantısı** (`NEPacketTunnelProvider`) — WireGuardKit, WireGuard
+  motoru, maskeleme taşıması ve UDP soketi.
+
+Taşıma katmanı tek bir protokolün arkasında takılabilir; böylece uygulama tek bir
+maskeleme yöntemine bağlı kalmaz:
+
+```swift
+protocol ObfuscationTransport {
+    func send(_ packet: Data) async throws
+    func receive() async throws -> Data
+}
+```
+
+Planlanan implementasyonlar: `PlainUDPTransport`, `UdpMaskTransport`, ve ileride
+`QUICTransport` / `ShadowsocksTransport`.
+
+## Yol haritası
+
+1. **Temel (Baseline)** — Packet Tunnel Uzantısı üzerinden düz WireGuard bağlantısının çalışması.
+2. **UDP maskeleme** — WireGuard paketlerinin baştaki baytlarını (ve isteğe bağlı
+   rastgele dolguyu) değiştiren, sunucu tarafında geri alınan basit taşıma.
+3. **Otomatik yedekleme (fallback)** — önce düz WireGuard → UDP mask → QUIC/UDP 443 dene.
+
+### İlk kilometre taşı — ulaşıldı ✅
+
+Fiziksel bir iPhone'dan (mobil veri üzerinden), düz WireGuard'ı engelleyen bir
+operatörde, ev ağ geçidinin arkasındaki bir WireGuard uç noktasına başarılı
+WireGuard el sıkışması. Ulaşıldı: maskeli el sıkışma + canlı trafik (internet ve
+LAN). Fikir uçtan uca doğrulandı.
+
+## Derleme
+
+### iOS uygulaması
+
+Xcode projesi `project.yml`'den
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) ile üretilir; WireGuard motoru,
+küçük bir yama setine ihtiyaç duyan sabitlenmiş bir `wireguard-apple`
+submodule'üdür (bugün güncel Xcode için build düzeltmeleri, ileride maskeleme bind'ı).
+
+```sh
+brew install xcodegen go        # araç zinciri (Go, wireguard-go köprüsünü derler)
+./scripts/setup-wireguard.sh    # submodule'ü başlat + yamaları uygula (idempotent)
+cp Local.xcconfig.example Local.xcconfig   # sonra DEVELOPMENT_TEAM değerini gir
+xcodegen generate
+open StealthWG.xcodeproj
+```
+
+Packet tunnel uzantısı yalnızca fiziksel cihazda çalışır (Network Extension'lar
+Simülatör'de çalışmaz) ve wireguard-go köprüsü yalnızca `iphoneos` için derlenir.
+
+### Gateway
+
+```sh
+cd gateway && go test ./... && go build ./cmd/stealthwg-gateway
+```
+
+### Profil formatı
+
+Uygulama, StealthWG `[Stealth]` bölümü olan standart bir wg-quick config'i içe
+aktarır. `[Peer] Endpoint` gateway'in mask portunu gösterir; `MaskKey` paylaşılan
+maskeleme PSK'sıdır (base64) — gateway'in çalıştığı anahtarla aynısı.
+
+```ini
+[Interface]
+PrivateKey = <istemci özel anahtarı>
+Address = 10.0.0.2/32
+
+[Peer]
+PublicKey = <sunucu açık anahtarı>
+Endpoint = <gateway public IP>:51819
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25
+
+[Stealth]
+MaskKey = <base64 PSK>
+```
+
+Parser testlerini `./scripts/test-parser.sh` ile çalıştır.
+
+## Tasarım ilkeleri
+
+- **Tasarımdan gizlilik.** Kullanıcı trafiği loglanmaz. Anahtarlar cihazdan çıkmaz.
+- **Güvenlik WireGuard'da kalır.** Maskeleme yalnızca parmak izini bozar, ikinci
+  bir şifreleme katmanı değildir.
+
+## Durum
+
+Kavram kanıtı (PoC) tamamlandı — maskeli WireGuard, düz WireGuard'ı engelleyen bir
+mobil operatör üzerinde fiziksel bir iPhone'da uçtan uca (el sıkışma ve canlı
+trafik) doğrulandı. Sertleştirme ve ürünleştirme sürüyor.
+
+## Lisans
+
+[MIT](LICENSE). MIT lisanslı WireGuard Apple projesi üzerine kuruludur.
