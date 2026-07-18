@@ -67,3 +67,9 @@ Icon?
 
 # ─── Claude Code local settings ──────────────────────────────────────────────
 .claude/settings.local.json
+
+# ─── Generated Xcode project (regenerated from project.yml via XcodeGen) ──────
+*.xcodeproj/
+
+# ─── Local signing config (personal Team ID) ─────────────────────────────────
+Local.xcconfig
