@@ -166,12 +166,14 @@ The Go (gateway) and Swift (client) codecs must produce **byte-identical**
 output. This is guaranteed by a shared set of **test vectors**:
 
 ```json
-{ "psk": "...", "nonce": "...", "wg_packet": "...", "masked": "..." }
+{ "psk": "...", "nonce": "...", "wg": "...", "pad": "...", "masked": "..." }
 ```
 
-Both implementations must reproduce `masked` from `(psk, nonce, wg_packet)` and
-recover `wg_packet` from `masked`. To make this testable, `mask()` takes the
-nonce as an explicit parameter; production `send()` generates a random nonce.
+All fields are base64. `pad` is included because it is XORed into the keystream,
+so `masked` is **not** reproducible from `(psk, nonce, wg)` alone. Both
+implementations must reproduce `masked` from `(psk, nonce, wg, pad)` and recover
+`wg` from `masked`. To make this testable, `mask()` takes the nonce and pad as
+explicit parameters; production `send()` generates a random nonce and padding.
 
 The Swift codec is written during the WireGuardKit integration step and validated
 against the same vectors; this phase produces the vectors from the Go side.

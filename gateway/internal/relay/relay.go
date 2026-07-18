@@ -16,8 +16,12 @@ import (
 
 // maxSessions bounds the session table so unauthenticated traffic cannot force
 // unbounded socket/goroutine growth. Open() is not authentication (no MAC), so
-// admission cannot be PSK-gated; a hard cap keeps the gateway alive under a
-// flood. Per-source throttling is deferred future hardening.
+// admission cannot be PSK-gated: a garbage datagram whose L-byte ciphertext
+// region happens to satisfy the plen check is admitted with probability
+// ~(L-1)/65536 (≈1.5% for ~1KB datagrams), so a spoofed-source flood can fill
+// the table. The cap keeps the gateway alive under such a flood but does not
+// stop it from denying new legitimate clients; per-source admission throttling
+// is the deferred next hardening step.
 const maxSessions = 1024
 
 type session struct {
