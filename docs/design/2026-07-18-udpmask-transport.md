@@ -7,8 +7,11 @@ real on-device handshake are a later step and are out of scope here.
 
 ## 1. Problem & threat model
 
-The target network (Vodafone mobile data, observed) blocks WireGuard on **every**
-UDP port while leaving non-WireGuard UDP working. This points to
+The adversary is any **DPI-based network operator** — mobile carriers (GSM/LTE/5G)
+and fixed-line ISPs — that inspects traffic and blocks WireGuard by its protocol
+signature. The observed behaviour on the first validation network (a mobile
+carrier) is representative of the class: WireGuard is blocked on **every** UDP
+port while non-WireGuard UDP keeps working. This points to
 **protocol fingerprinting**, not port or blanket-UDP blocking. WireGuard is easy
 to fingerprint:
 
@@ -22,10 +25,12 @@ plus fixed handshake sizes."*
 
 **Strategy:** reshape the WireGuard packet into a **high-entropy, variable-length
 UDP payload** with no fixed bytes, so it no longer matches the WireGuard
-fingerprint. Since generic UDP already passes, we do **not** need protocol
-mimicry (looking like QUIC/DNS). Mimicry is deliberately deferred; done poorly it
-becomes a *more* reliable fingerprint (cf. "The Parrot is Dead", Houmansadr et
-al., 2013).
+fingerprint. On networks where generic UDP passes (the common case for the
+fingerprinting operators above), this is sufficient and we do **not** need
+protocol mimicry (looking like QUIC/DNS). Mimicry is deliberately deferred; done
+poorly it becomes a *more* reliable fingerprint (cf. "The Parrot is Dead",
+Houmansadr et al., 2013). Operators that block all UDP are handled later by a
+separate TCP/443 transport behind the same interface, not by this one.
 
 **Non-goal:** this layer provides **no** cryptographic security. All security
 comes from WireGuard's own Noise protocol. The keyed transform here is a *quality
@@ -174,7 +179,8 @@ against the same vectors; this phase produces the vectors from the Go side.
 ## 7. MTU budget
 
 Masking adds `12 (nonce) + 2 (plen) + pad` bytes of overhead. To keep the outer
-UDP datagram under the path MTU on mobile networks (safe target ≈ 1280 bytes),
+UDP datagram under the path MTU on real-world carrier/ISP paths (safe target
+≈ 1280 bytes),
 the WireGuard interface MTU must be lowered from its 1420 default. Exact value is
 tuned against real measurements during on-device testing; the codec itself does
 not hardcode it.
@@ -188,5 +194,6 @@ not hardcode it.
 4. Recorded MTU-budget note for the later on-device tuning step.
 
 Out of scope here: the Swift `UdpMaskTransport`, WireGuardKit/Go bridge
-integration, and the real Vodafone→RB5009 handshake — all handled in the
-subsequent on-device phase.
+integration, and the real on-device handshake through a fingerprinting carrier
+(first validated on Vodafone → RB5009) — all handled in the subsequent on-device
+phase.
