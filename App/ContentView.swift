@@ -4,6 +4,9 @@ import NetworkExtension
 struct ContentView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
     @State private var profileText = ""
+    @State private var showScanner = false
+    @State private var showExport = false
+    @State private var scanError: String?
 
     var body: some View {
         VStack(spacing: 20) {
@@ -21,6 +24,13 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .disabled(profileText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
+                Button("Scan QR") { scanError = nil; showScanner = true }
+                    .buttonStyle(.bordered)
+
+                Button("Show QR") { showExport = true }
+                    .buttonStyle(.bordered)
+                    .disabled(!tunnelManager.hasProfile)
+
                 Spacer()
             }
 
@@ -34,9 +44,36 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
             }
 
+            if let scanError {
+                Text(scanError)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+
             Spacer()
         }
         .padding()
+        .sheet(isPresented: $showScanner) {
+            QRScannerView(
+                onScan: { code in
+                    showScanner = false
+                    Task { await tunnelManager.importProfile(code) }
+                },
+                onError: { message in
+                    scanError = message
+                    showScanner = false
+                }
+            )
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showExport) {
+            if let text = tunnelManager.currentProfileText() {
+                QRCodeView(text: text)
+            } else {
+                Text("No profile to export.").padding()
+            }
+        }
     }
 
     private var statusBadge: some View {

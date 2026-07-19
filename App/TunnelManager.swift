@@ -61,6 +61,19 @@ final class TunnelManager: ObservableObject {
         }
     }
 
+    /// Reconstructs the saved profile's raw text (wg-quick + `[Stealth]`) for
+    /// export, or nil when no profile is configured.
+    func currentProfileText() -> String? {
+        guard
+            let proto = manager?.protocolConfiguration as? NETunnelProviderProtocol,
+            let config = proto.providerConfiguration?["wgQuickConfig"] as? String
+        else {
+            return nil
+        }
+        let maskKey = proto.providerConfiguration?["maskKey"] as? String
+        return StealthProfile(wgQuickConfig: config, maskKey: maskKey).serialize()
+    }
+
     /// Start the tunnel using the saved profile.
     func connect() {
         do {
