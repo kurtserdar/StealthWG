@@ -2,15 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>com.apple.developer.networking.networkextension</key>
-    <array>
-        <string>packet-tunnel-provider-systemextension</string>
-    </array>
+    <!-- Phase 1 (UI-testable) entitlements: only App Groups, which the account
+         already provisions. Phase 2 adds the VPN capabilities:
+           com.apple.developer.system-extension.install (app)
+           com.apple.developer.networking.networkextension → packet-tunnel-provider-systemextension (extension)
+         once those capabilities are enabled on the App IDs in the developer portal. -->
     <key>com.apple.security.application-groups</key>
     <array>
         <string>group.com.stealthwg</string>
     </array>
-    <key>com.apple.developer.system-extension.install</key>
-    <true/>
 </dict>
 </plist>
