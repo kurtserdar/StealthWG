@@ -1,6 +1,18 @@
 import Foundation
 import NetworkExtension
 
+/// Live connection statistics shown in the UI, refreshed from the extension.
+struct ConnectionStats: Equatable {
+    var rxBytes: Int64
+    var txBytes: Int64
+    var rxRate: Double
+    var txRate: Double
+    var lastHandshakeSeconds: Int
+    var activeEndpoint: String?
+    var isFallback: Bool
+    var connectedSince: Date?
+}
+
 /// Observable wrapper around `NETunnelProviderManager` that the UI binds to.
 ///
 /// The app parses a pasted StealthWG profile, stores the wg-quick config and the
@@ -11,9 +23,13 @@ final class TunnelManager: ObservableObject {
     @Published private(set) var status: NEVPNStatus = .invalid
     @Published private(set) var lastError: String?
     @Published private(set) var hasProfile = false
+    @Published private(set) var stats: ConnectionStats?
 
     private var manager: NETunnelProviderManager?
     private var statusObserver: NSObjectProtocol?
+    private var statsTimer: Timer?
+    private var lastSample: (rx: Int64, tx: Int64, at: Date)?
+    private var connectedSince: Date?
 
     /// Load the existing tunnel configuration from preferences, if any.
     func load() async {
@@ -115,7 +131,96 @@ final class TunnelManager: ObservableObject {
             object: manager.connection,
             queue: .main
         ) { [weak self] _ in
-            self?.status = manager.connection.status
+            guard let self else { return }
+            self.status = manager.connection.status
+            self.handleStatusChange(self.status)
         }
+    }
+
+    // MARK: - Live stats
+
+    private func handleStatusChange(_ status: NEVPNStatus) {
+        if status == .connected {
+            if connectedSince == nil { connectedSince = Date() }
+            startStatsPolling()
+        } else {
+            stopStatsPolling()
+            if status != .reasserting {
+                connectedSince = nil
+                lastSample = nil
+                stats = nil
+            }
+        }
+    }
+
+    private func startStatsPolling() {
+        guard statsTimer == nil else { return }
+        statsTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.pollStats()
+        }
+        pollStats()
+    }
+
+    private func stopStatsPolling() {
+        statsTimer?.invalidate()
+        statsTimer = nil
+    }
+
+    private func pollStats() {
+        guard let session = manager?.connection as? NETunnelProviderSession else { return }
+        do {
+            try session.sendProviderMessage(Data("stats".utf8)) { [weak self] response in
+                guard
+                    let response,
+                    let obj = try? JSONSerialization.jsonObject(with: response) as? [String: Any]
+                else { return }
+                let runtime = obj["runtime"] as? String ?? ""
+                let parsed = parseRuntimeStats(runtime)
+                let activeEndpoint = obj["activeEndpoint"] as? String
+                let isFallback = obj["isFallback"] as? Bool ?? false
+                Task { @MainActor in
+                    self?.updateStats(parsed, activeEndpoint: activeEndpoint, isFallback: isFallback)
+                }
+            }
+        } catch {
+            // Transient (tunnel not ready yet); ignore and retry next tick.
+        }
+    }
+
+    private func updateStats(_ p: RuntimeStats, activeEndpoint: String?, isFallback: Bool) {
+        let now = Date()
+        var rxRate = 0.0
+        var txRate = 0.0
+        if let last = lastSample {
+            let dt = now.timeIntervalSince(last.at)
+            if dt > 0 {
+                rxRate = max(0, Double(p.rxBytes - last.rx) / dt)
+                txRate = max(0, Double(p.txBytes - last.tx) / dt)
+            }
+        }
+        lastSample = (p.rxBytes, p.txBytes, now)
+        stats = ConnectionStats(
+            rxBytes: p.rxBytes, txBytes: p.txBytes,
+            rxRate: rxRate, txRate: txRate,
+            lastHandshakeSeconds: p.lastHandshakeSeconds,
+            activeEndpoint: activeEndpoint, isFallback: isFallback,
+            connectedSince: connectedSince
+        )
+    }
+
+    /// Remove the saved tunnel configuration.
+    func deleteProfile() async {
+        stopStatsPolling()
+        do {
+            try await manager?.removeFromPreferences()
+        } catch {
+            lastError = error.localizedDescription
+        }
+        manager = nil
+        hasProfile = false
+        stats = nil
+        connectedSince = nil
+        lastSample = nil
+        status = .invalid
     }
 }
