@@ -2,14 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Signing-compatibility experiment: automatic signing can't produce a
-         profile with the -systemextension value, so use the plain value the
-         auto profile offers. If macOS rejects the system extension at runtime,
-         switch back to packet-tunnel-provider-systemextension with MANUAL
-         provisioning (portal profile that includes the systemextension value). -->
+    <!-- Correct value for a macOS packet-tunnel System Extension. Requires a
+         Developer ID provisioning profile (created in the portal) that includes
+         the systemextension network-extension entitlement — Path B. -->
     <key>com.apple.developer.networking.networkextension</key>
     <array>
-        <string>packet-tunnel-provider</string>
+        <string>packet-tunnel-provider-systemextension</string>
     </array>
     <key>com.apple.security.application-groups</key>
     <array>
