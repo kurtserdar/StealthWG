@@ -12,6 +12,14 @@ struct StealthProfile: Equatable {
     let wgQuickConfig: String
     /// Base64 PSK from `[Stealth] MaskKey`, or nil for plain WireGuard.
     let maskKey: String?
+    /// Ordered gateway endpoints to try (primary first). May be empty.
+    let endpoints: [String]
+
+    init(wgQuickConfig: String, maskKey: String?, endpoints: [String] = []) {
+        self.wgQuickConfig = wgQuickConfig
+        self.maskKey = maskKey
+        self.endpoints = endpoints
+    }
 
     enum ParseError: Error, Equatable {
         case emptyConfiguration
@@ -21,6 +29,8 @@ struct StealthProfile: Equatable {
     static func parse(_ raw: String) throws -> StealthProfile {
         var wgLines: [String] = []
         var maskKey: String?
+        var peerEndpoint: String?
+        var stealthEndpoints: [String] = []
         var inStealthSection = false
 
         for rawLine in raw.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -35,11 +45,21 @@ struct StealthProfile: Equatable {
             }
 
             if inStealthSection {
-                // Inside [Stealth]: capture MaskKey, drop every other line.
+                // Inside [Stealth]: capture MaskKey and Endpoints, drop the rest.
                 if let value = value(of: "MaskKey", in: trimmed) {
                     maskKey = value
                 }
+                if let value = value(of: "Endpoints", in: trimmed) {
+                    stealthEndpoints = value
+                        .split(separator: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                }
                 continue
+            }
+
+            if peerEndpoint == nil, let value = value(of: "Endpoint", in: trimmed) {
+                peerEndpoint = value
             }
 
             wgLines.append(line)
@@ -51,7 +71,11 @@ struct StealthProfile: Equatable {
         guard !wgConfig.isEmpty else {
             throw ParseError.emptyConfiguration
         }
-        return StealthProfile(wgQuickConfig: wgConfig, maskKey: maskKey)
+        var ordered: [String] = []
+        for ep in ([peerEndpoint].compactMap { $0 } + stealthEndpoints) where !ordered.contains(ep) {
+            ordered.append(ep)
+        }
+        return StealthProfile(wgQuickConfig: wgConfig, maskKey: maskKey, endpoints: ordered)
     }
 
     /// Reconstructs the raw StealthWG profile text: the wg-quick config, plus a
@@ -61,6 +85,9 @@ struct StealthProfile: Equatable {
         var out = wgQuickConfig
         if let maskKey {
             out += "\n\n[Stealth]\nMaskKey = \(maskKey)\n"
+            if endpoints.count > 1 {
+                out += "Endpoints = \(endpoints.joined(separator: ", "))\n"
+            }
         } else {
             out += "\n"
         }

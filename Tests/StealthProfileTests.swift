@@ -90,6 +90,32 @@ enum StealthProfileTests {
         let rtPlain = try! StealthProfile.parse(pp.serialize())
         check(rtPlain == pp, "round-trips plain profile")
 
+        // endpoints: primary from [Peer] Endpoint plus [Stealth] Endpoints, ordered/deduped.
+        let multi = """
+        [Interface]
+        PrivateKey = aaaa
+
+        [Peer]
+        PublicKey = bbbb
+        Endpoint = gw.example.com:51819
+        AllowedIPs = 0.0.0.0/0
+
+        [Stealth]
+        MaskKey = kkkk
+        Endpoints = gw.example.com:51819, gw.example.com:443
+        """
+        let pe = try! StealthProfile.parse(multi)
+        check(pe.endpoints == ["gw.example.com:51819", "gw.example.com:443"], "parses ordered deduped endpoints")
+
+        let single = try! StealthProfile.parse(full)
+        check(single.endpoints == ["1.2.3.4:51819"], "single endpoint from [Peer] only")
+
+        // serialize emits [Stealth] Endpoints when there is more than one; round-trips.
+        check(pe.serialize().contains("Endpoints = gw.example.com:51819, gw.example.com:443"), "serialize writes Endpoints")
+        let peRT = try! StealthProfile.parse(pe.serialize())
+        check(peRT.endpoints == pe.endpoints, "endpoints round-trip")
+        check(!single.serialize().contains("Endpoints ="), "no Endpoints line for a single endpoint")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
