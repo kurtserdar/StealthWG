@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import NetworkExtension
 
 /// Compact menu-bar panel: status, connect toggle, live endpoint/throughput.
@@ -34,7 +35,12 @@ struct MacMenuView: View {
             .buttonStyle(.borderedProminent).tint(Theme.accent)
             .disabled(!tunnelManager.hasProfile)
             Divider()
-            Button("Manage profile…") { openWindow(id: "manage") }
+            Button("Manage profile…") {
+                // An accessory (menu-bar) app must activate itself, otherwise the
+                // window opens behind other apps and appears to do nothing.
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "manage")
+            }
             Button("Quit StealthWG") { NSApplication.shared.terminate(nil) }
         }
         .padding(14).frame(width: 260)
