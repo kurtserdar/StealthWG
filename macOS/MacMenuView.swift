@@ -5,6 +5,7 @@ import NetworkExtension
 /// Compact menu-bar panel: status, connect toggle, live endpoint/throughput.
 struct MacMenuView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
+    @EnvironmentObject private var systemExtension: SystemExtensionManager
     @Environment(\.openWindow) private var openWindow
 
     private var isActive: Bool {
@@ -35,6 +36,11 @@ struct MacMenuView: View {
             .buttonStyle(.borderedProminent).tint(Theme.accent)
             .disabled(!tunnelManager.hasProfile)
             Divider()
+            Button("Enable VPN extension") { systemExtension.activate() }
+            if !systemExtension.statusMessage.isEmpty {
+                Text(systemExtension.statusMessage)
+                    .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             Button("Manage profile…") {
                 // An accessory (menu-bar) app must activate itself, otherwise the
                 // window opens behind other apps and appears to do nothing.

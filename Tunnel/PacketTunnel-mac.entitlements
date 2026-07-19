@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Phase 1 (UI-testable): App Groups only. Phase 2 adds
-         com.apple.developer.networking.networkextension →
-         packet-tunnel-provider-systemextension once the App ID's Network
-         Extensions capability is configured for the system-extension value. -->
+    <!-- The System Extension provides the packet tunnel. macOS system extensions
+         use the -systemextension entitlement value (not the app-extension one). -->
+    <key>com.apple.developer.networking.networkextension</key>
+    <array>
+        <string>packet-tunnel-provider-systemextension</string>
+    </array>
     <key>com.apple.security.application-groups</key>
     <array>
         <string>group.com.stealthwg</string>
