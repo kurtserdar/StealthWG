@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "mac", "size" : "512x512", "scale" : "2x", "filename" : "icon-1024.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
