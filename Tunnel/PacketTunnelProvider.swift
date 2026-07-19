@@ -67,6 +67,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
     }
 
+    // MARK: - App messages (live stats for the UI)
+
+    override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        adapter.getRuntimeConfiguration { [weak self] runtime in
+            let payload: [String: Any] = [
+                "runtime": runtime ?? "",
+                "activeEndpoint": self?.currentActiveEndpoint() as Any,
+                "isFallback": (self?.currentIndex ?? 0) > 0
+            ]
+            completionHandler?(try? JSONSerialization.data(withJSONObject: payload))
+        }
+    }
+
+    private func currentActiveEndpoint() -> String? {
+        guard !endpoints.isEmpty, currentIndex < endpoints.count else { return nil }
+        return endpoints[currentIndex]
+    }
+
     // MARK: - Endpoint fallback
 
     private func startFallbackPolling() {
