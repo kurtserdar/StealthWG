@@ -41,6 +41,9 @@ final class TunnelManager: ObservableObject {
             if let maskKey = profile.maskKey {
                 providerConfiguration["maskKey"] = maskKey
             }
+            if !profile.endpoints.isEmpty {
+                providerConfiguration["endpoints"] = profile.endpoints
+            }
             proto.providerConfiguration = providerConfiguration
 
             let manager = self.manager ?? NETunnelProviderManager()
@@ -71,7 +74,8 @@ final class TunnelManager: ObservableObject {
             return nil
         }
         let maskKey = proto.providerConfiguration?["maskKey"] as? String
-        return StealthProfile(wgQuickConfig: config, maskKey: maskKey).serialize()
+        let endpoints = proto.providerConfiguration?["endpoints"] as? [String] ?? []
+        return StealthProfile(wgQuickConfig: config, maskKey: maskKey, endpoints: endpoints).serialize()
     }
 
     /// Start the tunnel using the saved profile.
