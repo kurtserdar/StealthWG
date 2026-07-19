@@ -1,152 +1,46 @@
 import SwiftUI
-import NetworkExtension
 
 struct ContentView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
-    @State private var profileText = ""
-    @State private var showScanner = false
-    @State private var showExport = false
-    @State private var scanError: String?
+    @State private var showProfileSheet = false
 
     var body: some View {
+        Group {
+            if tunnelManager.hasProfile {
+                ConnectionView(showProfile: $showProfileSheet)
+            } else {
+                emptyState
+            }
+        }
+        .sheet(isPresented: $showProfileSheet) {
+            if tunnelManager.hasProfile {
+                ProfileDetailView().environmentObject(tunnelManager)
+            } else {
+                ProfileSetupView().environmentObject(tunnelManager)
+            }
+        }
+    }
+
+    private var emptyState: some View {
         VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "shield.slash")
+                .font(.system(size: 64))
+                .foregroundStyle(Theme.coral)
             Text("StealthWG")
-                .font(.largeTitle.bold())
-
-            statusBadge
-
-            profileEditor
-
-            HStack {
-                Button("Import profile") {
-                    Task { await tunnelManager.importProfile(profileText) }
-                }
-                .buttonStyle(.bordered)
-                .disabled(profileText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                Button("Scan QR") { scanError = nil; showScanner = true }
-                    .buttonStyle(.bordered)
-
-                Button("Show QR") { showExport = true }
-                    .buttonStyle(.bordered)
-                    .disabled(!tunnelManager.hasProfile)
-
-                Spacer()
+                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+            Text("Add a profile to start masking your connection.")
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button { showProfileSheet = true } label: {
+                Label("Add profile", systemImage: "plus")
+                    .frame(maxWidth: .infinity)
             }
-
-            connectButton
-                .disabled(!tunnelManager.hasProfile)
-
-            if let error = tunnelManager.lastError {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-            }
-
-            if let scanError {
-                Text(scanError)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-            }
-
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .padding(.horizontal, 40)
             Spacer()
         }
         .padding()
-        .sheet(isPresented: $showScanner) {
-            QRScannerView(
-                onScan: { code in
-                    showScanner = false
-                    Task { await tunnelManager.importProfile(code) }
-                },
-                onError: { message in
-                    scanError = message
-                    showScanner = false
-                }
-            )
-            .ignoresSafeArea()
-        }
-        .sheet(isPresented: $showExport) {
-            if let text = tunnelManager.currentProfileText() {
-                QRCodeView(text: text)
-            } else {
-                Text("No profile to export.").padding()
-            }
-        }
     }
-
-    private var statusBadge: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 12, height: 12)
-            Text(statusText)
-                .font(.headline)
-        }
-    }
-
-    private var profileEditor: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Profile (.conf with a [Stealth] section)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            TextEditor(text: $profileText)
-                .font(.system(.footnote, design: .monospaced))
-                .frame(height: 200)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.secondary.opacity(0.3))
-                )
-        }
-    }
-
-    private var connectButton: some View {
-        Button {
-            if isActive {
-                tunnelManager.disconnect()
-            } else {
-                tunnelManager.connect()
-            }
-        } label: {
-            Text(isActive ? "Disconnect" : "Connect")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(isActive ? .red : .accentColor)
-    }
-
-    private var isActive: Bool {
-        switch tunnelManager.status {
-        case .connected, .connecting, .reasserting:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var statusText: String {
-        switch tunnelManager.status {
-        case .invalid: return "Not configured"
-        case .disconnected: return "Disconnected"
-        case .connecting: return "Connecting…"
-        case .connected: return "Connected"
-        case .reasserting: return "Reconnecting…"
-        case .disconnecting: return "Disconnecting…"
-        @unknown default: return "Unknown"
-        }
-    }
-
-    private var statusColor: Color {
-        switch tunnelManager.status {
-        case .connected: return .green
-        case .connecting, .reasserting, .disconnecting: return .orange
-        default: return .gray
-        }
-    }
-}
-
-#Preview {
-    ContentView()
-        .environmentObject(TunnelManager())
 }
