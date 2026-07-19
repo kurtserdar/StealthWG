@@ -75,6 +75,21 @@ enum StealthProfileTests {
             check(false, "empty threw wrong error: \(error)")
         }
 
+        // serialize(): reconstructs raw text with a [Stealth] section when masked.
+        let s = StealthProfile(wgQuickConfig: "[Interface]\nPrivateKey = aaaa", maskKey: "kkkk").serialize()
+        check(s.contains("[Interface]"), "serialize keeps wg config")
+        check(s.contains("[Stealth]"), "serialize adds [Stealth] when masked")
+        check(s.contains("MaskKey = kkkk"), "serialize writes MaskKey")
+
+        let plainS = StealthProfile(wgQuickConfig: "[Interface]\nPrivateKey = aaaa", maskKey: nil).serialize()
+        check(!plainS.contains("[Stealth]"), "serialize omits [Stealth] when plain")
+
+        // Round-trip: parse(serialize(x)) == x for both masked and plain.
+        let rt = try! StealthProfile.parse(p.serialize())
+        check(rt == p, "round-trips masked profile")
+        let rtPlain = try! StealthProfile.parse(pp.serialize())
+        check(rtPlain == pp, "round-trips plain profile")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

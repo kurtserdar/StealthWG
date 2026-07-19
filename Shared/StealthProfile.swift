@@ -54,6 +54,19 @@ struct StealthProfile: Equatable {
         return StealthProfile(wgQuickConfig: wgConfig, maskKey: maskKey)
     }
 
+    /// Reconstructs the raw StealthWG profile text: the wg-quick config, plus a
+    /// trailing `[Stealth]` section carrying MaskKey when present. Inverse of
+    /// `parse`, so `parse(serialize(x)) == x`.
+    func serialize() -> String {
+        var out = wgQuickConfig
+        if let maskKey {
+            out += "\n\n[Stealth]\nMaskKey = \(maskKey)\n"
+        } else {
+            out += "\n"
+        }
+        return out
+    }
+
     /// Returns the value of `key = value` (case-insensitive key), or nil.
     private static func value(of key: String, in line: String) -> String? {
         guard let equals = line.firstIndex(of: "=") else { return nil }
