@@ -52,6 +52,9 @@ struct AddProfileView: View {
                 if case .success(let url) = result { importFromFile(url) }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 460, minHeight: 520)
+        #endif
     }
 
     private func importFromFile(_ url: URL) {
