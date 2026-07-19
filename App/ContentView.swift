@@ -19,7 +19,8 @@ struct ContentView: View {
             if tunnelManager.hasProfile {
                 ProfileDetailView().environmentObject(tunnelManager)
             } else {
-                ProfileSetupView().environmentObject(tunnelManager)
+                AddProfileView(onComplete: { showProfileSheet = false })
+                    .environmentObject(tunnelManager)
             }
         }
     }

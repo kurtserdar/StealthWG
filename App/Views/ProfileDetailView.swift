@@ -68,7 +68,8 @@ struct ProfileDetailView: View {
                 }
             }
             .sheet(isPresented: $showReplace) {
-                ProfileSetupView().environmentObject(tunnelManager)
+                AddProfileView(onComplete: { showReplace = false })
+                    .environmentObject(tunnelManager)
             }
         }
     }
