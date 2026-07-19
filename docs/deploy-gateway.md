@@ -48,6 +48,30 @@ services:
 Point the public UDP 51819 at this host, and the client `[Peer] Endpoint` at the
 public address.
 
+## Standalone bundle — WireGuard included (no existing WG server)
+
+If you do **not** already run WireGuard, the standalone bundle in
+`deploy/standalone/` brings up the masking relay **and** a WireGuard server
+together, and prints a ready-to-import StealthWG client profile (with a QR code).
+
+```sh
+cd deploy/standalone
+cp .env.example .env
+# edit .env: set PUBLIC_HOST to your server's public IP or DNS name
+docker compose up -d
+docker compose logs wg      # shows the client profile + QR to scan on your phone
+```
+
+Generated client profiles are also written to `deploy/standalone/profiles/`.
+Keys and the PSK persist in `deploy/standalone/data/` across restarts. To add
+more devices, set `PEERS` before the first `up` (or delete `data/` to
+reprovision). The host needs kernel WireGuard support (built into Linux 5.6+).
+
+Already have a WireGuard server? Don't use this bundle — run the relay alone (see
+"Generic Linux / VPS" above) and point `STEALTHWG_UPSTREAM` at your existing
+WireGuard. The relay is transparent to it: the only client change is
+`[Peer] Endpoint` → the relay `:51819` and adding `[Stealth] MaskKey`.
+
 ## MikroTik RB5009 (RouterOS container)
 
 This runs the gateway on the router itself, next to its WireGuard server, so no
