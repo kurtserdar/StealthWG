@@ -1,19 +1,20 @@
 import SwiftUI
 import NetworkExtension
 
-/// Palette and state language for StealthWG. The product masks WireGuard traffic,
-/// so the interface speaks in "masked / unmasked" and colors carry the story:
-/// teal when protected, amber mid-transition, coral when exposed.
+/// Palette and state language for StealthWG (Wraith identity). The product masks
+/// WireGuard traffic, so the interface speaks in "masked / unmasked": teal when
+/// masked/active, amber mid-transition, brand silver when unmasked (the wraith at
+/// rest, visible).
 enum Theme {
-    static let accent = Color(red: 0.10, green: 0.80, blue: 0.72)   // masked / protected
+    static let accent = Color(red: 0.20, green: 0.88, blue: 0.77)   // teal #34E0C4 — masked/active
+    static let silver = Color(red: 0.84, green: 0.87, blue: 0.91)   // brand silver #D7DEE9 — unmasked
     static let amber = Color(red: 0.98, green: 0.68, blue: 0.18)    // transitioning
-    static let coral = Color(red: 0.90, green: 0.44, blue: 0.38)    // exposed / off
 
     static func color(for status: NEVPNStatus) -> Color {
         switch status {
         case .connected: return accent
         case .connecting, .reasserting, .disconnecting: return amber
-        case .disconnected: return coral
+        case .disconnected: return silver
         default: return .secondary
         }
     }

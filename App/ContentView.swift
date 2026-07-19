@@ -24,9 +24,10 @@ struct ContentView: View {
     private var emptyState: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "shield.slash")
-                .font(.system(size: 64))
-                .foregroundStyle(Theme.coral)
+            Image("LaunchLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
             Text("StealthWG")
                 .font(.system(.largeTitle, design: .rounded).weight(.bold))
             Text("Add a profile to start masking your connection.")
