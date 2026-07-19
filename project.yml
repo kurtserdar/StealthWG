@@ -97,7 +97,9 @@ targets:
       - path: App/Platform.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg
+        # Distinct macOS bundle ids so the App IDs don't collide with the iOS
+        # ones (which carry different, platform-specific entitlement values).
+        PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac
         PRODUCT_NAME: StealthWG
         CODE_SIGN_ENTITLEMENTS: macOS/StealthWG-mac.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -119,8 +121,8 @@ targets:
       - Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.tunnel
-        PRODUCT_NAME: com.stealthwg.tunnel
+        PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac.tunnel
+        PRODUCT_NAME: com.stealthwg.mac.tunnel
         CODE_SIGN_ENTITLEMENTS: Tunnel/PacketTunnel-mac.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Tunnel/Info-mac.plist

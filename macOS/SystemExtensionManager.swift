@@ -5,7 +5,7 @@ import SystemExtensions
 /// requires a signed, notarized app the user approves in System Settings.
 final class SystemExtensionManager: NSObject, ObservableObject, OSSystemExtensionRequestDelegate {
     @Published var statusMessage = ""
-    static let extensionIdentifier = "com.stealthwg.tunnel"
+    static let extensionIdentifier = "com.stealthwg.mac.tunnel"
 
     func activate() {
         let request = OSSystemExtensionRequest.activationRequest(
