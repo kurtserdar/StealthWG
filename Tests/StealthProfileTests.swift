@@ -116,6 +116,18 @@ enum StealthProfileTests {
         check(peRT.endpoints == pe.endpoints, "endpoints round-trip")
         check(!single.serialize().contains("Endpoints ="), "no Endpoints line for a single endpoint")
 
+        // FallbackPlan transitions.
+        let plan = FallbackPlan(endpointCount: 2, perEndpointTimeout: 12)
+        check(plan.decide(index: 0, elapsed: 3, handshaked: true) == .connected, "handshake -> connected")
+        check(plan.decide(index: 0, elapsed: 3, handshaked: false) == .keepWaiting, "within timeout -> keepWaiting")
+        check(plan.decide(index: 0, elapsed: 13, handshaked: false) == .tryNext(index: 1), "timeout -> tryNext")
+        check(plan.decide(index: 1, elapsed: 13, handshaked: false) == .exhausted, "last timeout -> exhausted")
+
+        // lastHandshakeSeconds parsing.
+        check(lastHandshakeSeconds(fromRuntimeConfig: "private_key=x\nlast_handshake_time_sec=1699999999\n") == 1699999999, "parses handshake secs")
+        check(lastHandshakeSeconds(fromRuntimeConfig: "last_handshake_time_sec=0\n") == 0, "zero handshake secs")
+        check(lastHandshakeSeconds(fromRuntimeConfig: "no handshake here") == 0, "absent -> 0")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

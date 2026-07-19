@@ -10,6 +10,7 @@ BIN="$(mktemp -d)/parsertest"
 
 swiftc -o "$BIN" \
     "$ROOT/Shared/StealthProfile.swift" \
+    "$ROOT/Shared/StealthFallback.swift" \
     "$ROOT/Tests/StealthProfileTests.swift"
 
 "$BIN"
