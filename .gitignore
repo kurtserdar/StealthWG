@@ -78,3 +78,6 @@ Local.xcconfig
 deploy/standalone/data/
 deploy/standalone/profiles/
 deploy/standalone/.env
+
+# Go build output (compiled gateway binary)
+gateway/stealthwg-gateway
