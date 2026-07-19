@@ -13,6 +13,7 @@ swiftc -o "$BIN" \
     "$ROOT/Shared/StealthFallback.swift" \
     "$ROOT/Shared/RuntimeStats.swift" \
     "$ROOT/Shared/ProfileSummary.swift" \
+    "$ROOT/Shared/ProfileDraft.swift" \
     "$ROOT/Tests/StealthProfileTests.swift"
 
 "$BIN"

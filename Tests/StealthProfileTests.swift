@@ -128,6 +128,29 @@ enum StealthProfileTests {
         check(lastHandshakeSeconds(fromRuntimeConfig: "last_handshake_time_sec=0\n") == 0, "zero handshake secs")
         check(lastHandshakeSeconds(fromRuntimeConfig: "no handshake here") == 0, "absent -> 0")
 
+        // ProfileDraft key derivation matches wg pubkey (known vector).
+        var d = ProfileDraft.defaults()
+        d.privateKey = "+CzRHZBUtXJnt/TL+e2kKcfR5Vsd9qC4Ij+Eg4kaRko="
+        check(d.derivedPublicKey == "NF8+fWQ3lf9yrvod689ZMK2CP6H1JnYK3lER0ka4M2A=", "draft derives wg public key")
+        check(ProfileDraft.defaults().derivedPublicKey == nil, "empty private -> nil public")
+        check(ProfileDraft.randomBase64Key().count == 44, "random key is 44-char base64")
+        var g = ProfileDraft.defaults(); g.generateKeypair()
+        check(g.derivedPublicKey != nil, "generated keypair has a valid public key")
+
+        // build() assembles and round-trips through StealthProfile.parse.
+        var bd = ProfileDraft.defaults()
+        bd.privateKey = "+CzRHZBUtXJnt/TL+e2kKcfR5Vsd9qC4Ij+Eg4kaRko="
+        bd.serverPublicKey = "SRVPUB"
+        bd.endpoint = "gw.example.com:51819"
+        bd.maskKey = "MASKKEY"
+        bd.fallbackEndpoints = ["gw.example.com:443"]
+        let bt = bd.build()
+        let bp = try! StealthProfile.parse(bt)
+        check(bp.maskKey == "MASKKEY", "build round-trips mask key")
+        check(bp.endpoints == ["gw.example.com:51819", "gw.example.com:443"], "build round-trips endpoints")
+        check(bt.contains("PersistentKeepalive = 25"), "build includes keepalive default")
+        check(!bt.contains("PresharedKey"), "build omits empty preshared key")
+
         // parseRuntimeStats: sums rx/tx across peers, reuses handshake parse.
         let uapi = """
         private_key=abc
