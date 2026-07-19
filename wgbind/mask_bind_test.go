@@ -145,3 +145,56 @@ func TestSendPutsMaskedBytesOnWire(t *testing.T) {
 		t.Fatalf("recovered mismatch: got %q want %q", recovered, payload)
 	}
 }
+
+// identityObf is a trivial Obfuscator (no transform) proving the bind is generic
+// over the interface, not tied to *mask.Codec.
+type identityObf struct{}
+
+func (identityObf) Seal(wg []byte) ([]byte, error)   { return append([]byte(nil), wg...), nil }
+func (identityObf) Open(wire []byte) ([]byte, error) { return append([]byte(nil), wire...), nil }
+
+func TestBindIsGenericOverObfuscator(t *testing.T) {
+	var _ Obfuscator = (*mask.Codec)(nil)
+	var _ Obfuscator = identityObf{}
+
+	// Echo server that returns bytes unchanged; identity obfuscator round-trips.
+	gw, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer gw.Close()
+	go func() {
+		buf := make([]byte, 65535)
+		for {
+			n, addr, err := gw.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			gw.WriteToUDP(buf[:n], addr)
+		}
+	}()
+
+	mb := New(conn.NewStdNetBind(), identityObf{})
+	fns, _, err := mb.Open(0)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer mb.Close()
+	ep, err := mb.ParseEndpoint(gw.LocalAddr().String())
+	if err != nil {
+		t.Fatalf("ParseEndpoint: %v", err)
+	}
+	payload := []byte("generic bind payload")
+	if err := mb.Send(payload, ep); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	buf := make([]byte, 65535)
+	_ = gw.SetReadDeadline(time.Now().Add(time.Second))
+	n, _, err := fns[0](buf)
+	if err != nil {
+		t.Fatalf("recv: %v", err)
+	}
+	if !bytes.Equal(buf[:n], payload) {
+		t.Fatalf("round trip mismatch: %q", buf[:n])
+	}
+}

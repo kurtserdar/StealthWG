@@ -8,7 +8,6 @@
 package wgbind
 
 import (
-	"github.com/kurtserdar/StealthWG/mask"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -16,16 +15,25 @@ import (
 // is the largest a UDP payload can be.
 const maxDatagram = 65535
 
-// MaskBind wraps an inner conn.Bind and applies the UdpMask codec at the UDP
+// Obfuscator transforms WireGuard datagrams to and from their on-wire form.
+// mask.Codec satisfies it today; a future transport (e.g. QUIC) can provide
+// another implementation. The seam fits per-datagram obfuscation; a streaming
+// transport may need it revised.
+type Obfuscator interface {
+	Seal(wg []byte) ([]byte, error)   // outbound WG datagram -> wire bytes
+	Open(wire []byte) ([]byte, error) // inbound wire bytes -> WG datagram
+}
+
+// MaskBind wraps an inner conn.Bind and applies an Obfuscator at the UDP
 // I/O boundary.
 type MaskBind struct {
 	inner conn.Bind
-	codec *mask.Codec
+	obf   Obfuscator
 }
 
-// New returns a conn.Bind that masks traffic through inner using codec.
-func New(inner conn.Bind, codec *mask.Codec) *MaskBind {
-	return &MaskBind{inner: inner, codec: codec}
+// New returns a conn.Bind that obfuscates traffic through inner using obf.
+func New(inner conn.Bind, obf Obfuscator) *MaskBind {
+	return &MaskBind{inner: inner, obf: obf}
 }
 
 // Open opens the inner bind and wraps each receive function so that inbound
@@ -46,7 +54,7 @@ func (b *MaskBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 			if err != nil {
 				return 0, ep, err
 			}
-			wg, err := b.codec.Open(scratch[:n])
+			wg, err := b.obf.Open(scratch[:n])
 			if err != nil {
 				// Undecryptable/garbage datagram: drop it by reporting an
 				// empty read rather than surfacing bytes to WireGuard.
@@ -60,7 +68,7 @@ func (b *MaskBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 
 // Send masks b and sends it through the inner bind.
 func (b *MaskBind) Send(buf []byte, ep conn.Endpoint) error {
-	masked, err := b.codec.Seal(buf)
+	masked, err := b.obf.Seal(buf)
 	if err != nil {
 		return err
 	}
