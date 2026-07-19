@@ -67,6 +67,18 @@ Keys and the PSK persist in `deploy/standalone/data/` across restarts. To add
 more devices, set `PEERS` before the first `up` (or delete `data/` to
 reprovision). The host needs kernel WireGuard support (built into Linux 5.6+).
 
+The bundle also exposes the relay on UDP 443. To use both (so the client falls
+back to 443 when 51819 is blocked), list both in the profile's `[Stealth]`
+section:
+
+```
+[Stealth]
+MaskKey = <PSK>
+Endpoints = <PUBLIC_HOST>:51819, <PUBLIC_HOST>:443
+```
+
+The client tries them in order and stays on the first that completes a handshake.
+
 Already have a WireGuard server? Don't use this bundle — run the relay alone (see
 "Generic Linux / VPS" above) and point `STEALTHWG_UPSTREAM` at your existing
 WireGuard. The relay is transparent to it: the only client change is

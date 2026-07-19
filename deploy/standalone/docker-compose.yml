@@ -32,3 +32,18 @@ services:
       STEALTHWG_PSK_FILE: "/data/psk"
     volumes:
       - ./data:/data:ro
+
+  # Second relay on UDP 443 so a client can fall back to :443 when :51819 is
+  # blocked. Same masked WireGuard, same upstream — only the port differs.
+  gateway443:
+    image: ghcr.io/kurtserdar/stealthwg-gateway:latest
+    restart: unless-stopped
+    depends_on:
+      - wg
+    ports:
+      - "443:51819/udp"
+    environment:
+      STEALTHWG_UPSTREAM: "wg:51820"
+      STEALTHWG_PSK_FILE: "/data/psk"
+    volumes:
+      - ./data:/data:ro
