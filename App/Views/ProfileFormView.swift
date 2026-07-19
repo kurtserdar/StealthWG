@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// Full editor: build a profile from fields, generate/derive keys, save.
 struct ProfileFormView: View {
@@ -51,7 +50,7 @@ struct ProfileFormView: View {
             }
         }
         .navigationTitle("Create profile")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -83,7 +82,7 @@ struct ProfileFormView: View {
                         Text(pub).font(.system(.caption2, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer()
-                    Button { UIPasteboard.general.string = pub } label: { Image(systemName: "doc.on.doc") }
+                    Button { Clipboard.copy(pub) } label: { Image(systemName: "doc.on.doc") }
                         .buttonStyle(.borderless)
                 }
                 Text("Add this public key to your server as a peer.")
@@ -109,7 +108,7 @@ private struct DraftField: View {
             TextField(placeholder.isEmpty ? title : placeholder, text: $text)
                 .font(.system(.footnote, design: .monospaced))
                 .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
+                .noAutocap()
         }
     }
 }

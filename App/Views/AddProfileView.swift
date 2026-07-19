@@ -7,7 +7,9 @@ struct AddProfileView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
     let onComplete: () -> Void
 
+    #if os(iOS)
     @State private var showScanner = false
+    #endif
     @State private var showFileImporter = false
     @State private var errorText: String?
 
@@ -17,9 +19,11 @@ struct AddProfileView: View {
                 NavigationLink { PasteImportView(onComplete: onComplete) } label: {
                     methodRow("Paste text", "A .conf with a [Stealth] section", "doc.on.clipboard")
                 }
+                #if os(iOS)
                 Button { showScanner = true } label: {
                     methodRow("Scan QR code", "Import with the camera", "qrcode.viewfinder")
                 }
+                #endif
                 Button { showFileImporter = true } label: {
                     methodRow("Import file", "Choose a .conf file", "folder")
                 }
@@ -31,8 +35,9 @@ struct AddProfileView: View {
                 }
             }
             .navigationTitle("Add profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavTitle()
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close", action: onComplete) } }
+            #if os(iOS)
             .sheet(isPresented: $showScanner) {
                 QRScannerView(
                     onScan: { code in
@@ -42,6 +47,7 @@ struct AddProfileView: View {
                     onError: { m in errorText = m; showScanner = false }
                 ).ignoresSafeArea()
             }
+            #endif
             .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
                 if case .success(let url) = result { importFromFile(url) }
             }
@@ -88,7 +94,7 @@ struct PasteImportView: View {
         }
         .padding()
         .navigationTitle("Paste")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Import") {
