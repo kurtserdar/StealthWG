@@ -9,6 +9,7 @@ enum Theme {
     static let accent = Color(red: 0.20, green: 0.88, blue: 0.77)   // teal #34E0C4 — masked/active
     static let silver = Color(red: 0.84, green: 0.87, blue: 0.91)   // brand silver #D7DEE9 — unmasked
     static let amber = Color(red: 0.98, green: 0.68, blue: 0.18)    // transitioning
+    static let ink = Color(red: 0.102, green: 0.129, blue: 0.188)   // #1A2130 — app background (matches launch)
 
     static func color(for status: NEVPNStatus) -> Color {
         switch status {

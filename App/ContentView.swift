@@ -5,11 +5,14 @@ struct ContentView: View {
     @State private var showProfileSheet = false
 
     var body: some View {
-        Group {
-            if tunnelManager.hasProfile {
-                ConnectionView(showProfile: $showProfileSheet)
-            } else {
-                emptyState
+        ZStack {
+            Theme.ink.ignoresSafeArea()
+            Group {
+                if tunnelManager.hasProfile {
+                    ConnectionView(showProfile: $showProfileSheet)
+                } else {
+                    emptyState
+                }
             }
         }
         .sheet(isPresented: $showProfileSheet) {

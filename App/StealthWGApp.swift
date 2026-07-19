@@ -8,6 +8,7 @@ struct StealthWGApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(tunnelManager)
+                .preferredColorScheme(.dark)
                 .task { await tunnelManager.load() }
         }
     }
