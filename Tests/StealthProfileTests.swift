@@ -128,6 +128,29 @@ enum StealthProfileTests {
         check(lastHandshakeSeconds(fromRuntimeConfig: "last_handshake_time_sec=0\n") == 0, "zero handshake secs")
         check(lastHandshakeSeconds(fromRuntimeConfig: "no handshake here") == 0, "absent -> 0")
 
+        // parseRuntimeStats: sums rx/tx across peers, reuses handshake parse.
+        let uapi = """
+        private_key=abc
+        public_key=def
+        rx_bytes=1500
+        tx_bytes=800
+        last_handshake_time_sec=1699999999
+        """
+        let rs = parseRuntimeStats(uapi)
+        check(rs.rxBytes == 1500, "rx parsed")
+        check(rs.txBytes == 800, "tx parsed")
+        check(rs.lastHandshakeSeconds == 1699999999, "handshake parsed")
+        check(parseRuntimeStats("no counters").rxBytes == 0, "missing rx -> 0")
+
+        // ProfileSummary.from: pulls display fields from wgQuickConfig + endpoints/mask.
+        let summ = ProfileSummary.from(pe)   // pe: masked, 2 endpoints
+        check(summ.maskingOn == true, "summary masking on")
+        check(summ.endpoints == ["gw.example.com:51819", "gw.example.com:443"], "summary endpoints")
+        check(summ.peerPublicKey == "bbbb", "summary peer pubkey")
+        let summ2 = ProfileSummary.from(single)   // single: full profile with Address/Endpoint
+        check(summ2.address == "10.0.0.2/32", "summary address parsed")
+        check(summ2.maskingOn == true, "summary2 masking on")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
