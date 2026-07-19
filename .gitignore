@@ -73,3 +73,8 @@ Icon?
 
 # ─── Local signing config (personal Team ID) ─────────────────────────────────
 Local.xcconfig
+
+# StealthWG standalone runtime state (keys, PSK, generated profiles)
+deploy/standalone/data/
+deploy/standalone/profiles/
+deploy/standalone/.env
