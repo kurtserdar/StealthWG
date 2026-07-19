@@ -62,6 +62,11 @@ docker compose up -d
 docker compose logs wg      # shows the client profile + QR to scan on your phone
 ```
 
+Both images are published (`ghcr.io/kurtserdar/stealthwg-gateway` and
+`ghcr.io/kurtserdar/stealthwg-wg`), so `up` just pulls them — no local build.
+To build the WireGuard-server image from source instead, run
+`docker compose build`.
+
 Generated client profiles are also written to `deploy/standalone/profiles/`.
 Keys and the PSK persist in `deploy/standalone/data/` across restarts. To add
 more devices, set `PEERS` before the first `up` (or delete `data/` to

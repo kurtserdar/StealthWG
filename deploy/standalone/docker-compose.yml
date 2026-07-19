@@ -2,8 +2,9 @@
 # One command on a WG-less Linux host: `docker compose up -d`.
 services:
   wg:
+    # Pulls the published image; `docker compose build` rebuilds from ./wg.
+    image: ghcr.io/kurtserdar/stealthwg-wg:latest
     build: ./wg
-    image: stealthwg-wg:dev
     restart: unless-stopped
     cap_add: ["NET_ADMIN"]
     sysctls:
