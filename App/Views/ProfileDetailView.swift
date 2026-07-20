@@ -74,6 +74,17 @@ struct ProfileDetailView: View {
                     Text("Automatically connect and stay on; block traffic if the VPN drops.")
                         .font(.caption2).foregroundStyle(.secondary)
 
+                    if current.onDemand {
+                        NavigationLink {
+                            TrustedNetworksView(
+                                profileID: profile.id,
+                                ssids: current.trustedSSIDs,
+                                trustCellular: current.trustCellular)
+                        } label: {
+                            Label("Trusted networks", systemImage: "wifi.circle")
+                        }
+                    }
+
                     Toggle("Kill switch (route all traffic)", isOn: Binding(
                         get: { current.killSwitch },
                         set: { v in Task { await tunnelManager.setKillSwitch(id: profile.id, enabled: v) } }))

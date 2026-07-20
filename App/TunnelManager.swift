@@ -259,9 +259,10 @@ final class TunnelManager: ObservableObject {
         }
     }
 
-    /// Maps pure rule specs to NEOnDemandRule objects.
+    /// Maps pure rule specs to NEOnDemandRule objects. Cellular specs are dropped on
+    /// macOS, where the interface type does not exist.
     private func makeOnDemandRules(_ specs: [OnDemandRuleSpec]) -> [NEOnDemandRule] {
-        specs.map { spec in
+        specs.compactMap { spec in
             let rule: NEOnDemandRule
             switch spec.action {
             case .connect: rule = NEOnDemandRuleConnect()
@@ -271,7 +272,12 @@ final class TunnelManager: ObservableObject {
             switch spec.interface {
             case .any: rule.interfaceTypeMatch = .any
             case .wifi: rule.interfaceTypeMatch = .wiFi
-            case .cellular: rule.interfaceTypeMatch = .cellular
+            case .cellular:
+                #if os(iOS)
+                rule.interfaceTypeMatch = .cellular
+                #else
+                return nil   // no cellular interface on macOS
+                #endif
             }
             if !spec.ssids.isEmpty { rule.ssidMatch = spec.ssids }
             return rule
