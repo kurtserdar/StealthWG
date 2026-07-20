@@ -102,6 +102,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac
         PRODUCT_NAME: StealthWG
         CODE_SIGN_ENTITLEMENTS: macOS/StealthWG-mac.entitlements
+        # Manual Developer ID signing for notarization (Path B).
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+        PROVISIONING_PROFILE_SPECIFIER: "StealthWG mac"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: StealthWG
@@ -124,6 +128,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac.tunnel
         PRODUCT_NAME: com.stealthwg.mac.tunnel
         CODE_SIGN_ENTITLEMENTS: Tunnel/PacketTunnel-mac.entitlements
+        # Manual Developer ID signing for notarization (Path B).
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+        PROVISIONING_PROFILE_SPECIFIER: "StealthWG mac tunnel"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: Tunnel/Info-mac.plist
         SWIFT_OBJC_BRIDGING_HEADER: Tunnel/StealthBridge.h
