@@ -102,6 +102,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac
         PRODUCT_NAME: StealthWG
         CODE_SIGN_ENTITLEMENTS: macOS/StealthWG-mac.entitlements
+        # Notarization requires the Hardened Runtime.
+        ENABLE_HARDENED_RUNTIME: YES
         # Manual Developer ID signing for notarization (Path B).
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Developer ID Application"
@@ -128,6 +130,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.mac.tunnel
         PRODUCT_NAME: com.stealthwg.mac.tunnel
         CODE_SIGN_ENTITLEMENTS: Tunnel/PacketTunnel-mac.entitlements
+        # Notarization requires the Hardened Runtime.
+        ENABLE_HARDENED_RUNTIME: YES
         # Manual Developer ID signing for notarization (Path B).
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Developer ID Application"
