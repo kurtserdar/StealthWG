@@ -18,6 +18,7 @@ import (
 // Config holds the resolved gateway settings.
 type Config struct {
 	Listen   string
+	QUIC     string // QUIC listen address (e.g. ":443"); empty disables the QUIC relay.
 	Upstream string
 	PSK      []byte
 	Timeout  time.Duration
@@ -57,6 +58,7 @@ func envInt(key string, def int) int {
 func Parse(args []string) (*Config, error) {
 	fs := flag.NewFlagSet("stealthwg-gateway", flag.ContinueOnError)
 	listen := fs.String("listen", envStr("STEALTHWG_LISTEN", ":51819"), "mask-side UDP listen address")
+	quicListen := fs.String("quic", envStr("STEALTHWG_QUIC", ""), "QUIC listen address (e.g. :443); empty disables the QUIC relay")
 	upstream := fs.String("upstream", envStr("STEALTHWG_UPSTREAM", ""), "upstream WireGuard endpoint host:port (required)")
 	psk := fs.String("psk", envStr("STEALTHWG_PSK", ""), "obfuscation PSK, base64 (or use -psk-file)")
 	pskFile := fs.String("psk-file", envStr("STEALTHWG_PSK_FILE", ""), "path to a file containing the base64 PSK")
@@ -91,6 +93,7 @@ func Parse(args []string) (*Config, error) {
 
 	return &Config{
 		Listen:   *listen,
+		QUIC:     *quicListen,
 		Upstream: *upstream,
 		PSK:      pskBytes,
 		Timeout:  *timeout,

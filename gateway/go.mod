@@ -1,6 +1,6 @@
 module github.com/kurtserdar/StealthWG/gateway
 
-go 1.25.0
+go 1.26.5
 
 require (
 	github.com/kurtserdar/StealthWG/wgbind v0.0.0-00010101000000-000000000000
@@ -15,9 +15,14 @@ require (
 
 require (
 	github.com/kurtserdar/StealthWG/mask v0.0.0
+	github.com/kurtserdar/StealthWG/quictransport v0.0.0
 	golang.org/x/sys v0.47.0 // indirect
 )
+
+require github.com/quic-go/quic-go v0.60.0 // indirect
 
 replace github.com/kurtserdar/StealthWG/mask => ../mask
 
 replace github.com/kurtserdar/StealthWG/wgbind => ../wgbind
+
+replace github.com/kurtserdar/StealthWG/quictransport => ../quictransport

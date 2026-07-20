@@ -15,10 +15,14 @@ func TestParseUsesEnvVars(t *testing.T) {
 	t.Setenv("STEALTHWG_LISTEN", ":6000")
 	t.Setenv("STEALTHWG_PADMAX", "64")
 	t.Setenv("STEALTHWG_TIMEOUT", "90s")
+	t.Setenv("STEALTHWG_QUIC", ":443")
 
 	cfg, err := Parse(nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.QUIC != ":443" {
+		t.Fatalf("env quic: got %q", cfg.QUIC)
 	}
 	if cfg.Upstream != "10.0.0.1:51820" {
 		t.Fatalf("env upstream: got %q", cfg.Upstream)
