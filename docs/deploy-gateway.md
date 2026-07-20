@@ -57,6 +57,7 @@ variables (flag > env > default):
 | Flag         | Env var               | Default    | Meaning                              |
 |--------------|-----------------------|------------|--------------------------------------|
 | `-listen`    | `STEALTHWG_LISTEN`    | `:51819`   | mask-side UDP listen address         |
+| `-quic`      | `STEALTHWG_QUIC`      | — (off)    | QUIC listen address (e.g. `:443`); runs alongside the mask listener |
 | `-upstream`  | `STEALTHWG_UPSTREAM`  | (required) | real WireGuard endpoint `host:port`  |
 | `-psk`       | `STEALTHWG_PSK`       | (required) | obfuscation PSK, base64              |
 | `-psk-file`  | `STEALTHWG_PSK_FILE`  | —          | file holding the base64 PSK          |
@@ -115,17 +116,25 @@ Keys and the PSK persist in `deploy/standalone/data/` across restarts. To add
 more devices, set `PEERS` before the first `up` (or delete `data/` to
 reprovision). The host needs kernel WireGuard support (built into Linux 5.6+).
 
-The bundle also exposes the relay on UDP 443. To use both (so the client falls
-back to 443 when 51819 is blocked), list both in the profile's `[Stealth]`
-section:
+The gateway container runs two listeners on the same upstream: the UDP mask on
+51819 and **QUIC** (HTTP/3-shaped) on 443 (`STEALTHWG_QUIC=:443` in the compose
+file). List both in the profile's `[Stealth]` section, marking the 443 endpoint
+with the `quic://` scheme so the client dials it over QUIC and falls back to the
+mask when needed:
 
 ```
 [Stealth]
 MaskKey = <PSK>
-Endpoints = <PUBLIC_HOST>:51819, <PUBLIC_HOST>:443
+Endpoints = <PUBLIC_HOST>:51819, quic://<PUBLIC_HOST>:443
 ```
 
 The client tries them in order and stays on the first that completes a handshake.
+For a QUIC-first profile, set `[Stealth] Transport = quic` and point
+`[Peer] Endpoint` at `<PUBLIC_HOST>:443`.
+
+> QUIC prints a one-time warning about the UDP receive-buffer size in containers.
+> It is harmless; to silence it (and improve throughput) raise the host's
+> `net.core.rmem_max`/`wmem_max` to 7 MiB.
 
 Already have a WireGuard server? Don't use this bundle — run the relay alone (see
 "Generic Linux / VPS" above) and point `STEALTHWG_UPSTREAM` at your existing

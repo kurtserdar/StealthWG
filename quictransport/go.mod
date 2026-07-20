@@ -1,6 +1,6 @@
 module github.com/kurtserdar/StealthWG/quictransport
 
-go 1.26.5
+go 1.25.0
 
 require github.com/quic-go/quic-go v0.60.0
 

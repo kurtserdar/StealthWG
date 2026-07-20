@@ -38,17 +38,9 @@ index 22863b1..6f08141 100644
  		logger.Verbosef("StealthWG: UdpMask bind enabled")
  	}
 diff --git a/Sources/WireGuardKitGo/go.mod b/Sources/WireGuardKitGo/go.mod
-index c424ca2..265a96f 100644
+index c424ca2..b494d2a 100644
 --- a/Sources/WireGuardKitGo/go.mod
 +++ b/Sources/WireGuardKitGo/go.mod
-@@ -1,6 +1,6 @@
- module golang.zx2c4.com/wireguard/apple
- 
--go 1.25.0
-+go 1.26.5
- 
- require (
- 	golang.org/x/sys v0.47.0
 @@ -9,12 +9,17 @@ require (
  
  require (

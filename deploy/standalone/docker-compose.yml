@@ -21,6 +21,9 @@ services:
       - ./data:/data
       - ./profiles:/profiles
 
+  # One gateway, two listeners on the same upstream: the UDP mask on 51819 and
+  # QUIC (HTTP/3-shaped) on 443. A client can dial either and fall back between
+  # them (profile: `Endpoints = <host>:51819, quic://<host>:443`).
   gateway:
     image: ghcr.io/kurtserdar/stealthwg-gateway:latest
     restart: unless-stopped
@@ -28,23 +31,10 @@ services:
       - wg
     ports:
       - "51819:51819/udp"
+      - "443:443/udp"
     environment:
       STEALTHWG_UPSTREAM: "wg:51820"
       STEALTHWG_PSK_FILE: "/data/psk"
-    volumes:
-      - ./data:/data:ro
-
-  # Second relay on UDP 443 so a client can fall back to :443 when :51819 is
-  # blocked. Same masked WireGuard, same upstream — only the port differs.
-  gateway443:
-    image: ghcr.io/kurtserdar/stealthwg-gateway:latest
-    restart: unless-stopped
-    depends_on:
-      - wg
-    ports:
-      - "443:51819/udp"
-    environment:
-      STEALTHWG_UPSTREAM: "wg:51820"
-      STEALTHWG_PSK_FILE: "/data/psk"
+      STEALTHWG_QUIC: ":443"
     volumes:
       - ./data:/data:ro

@@ -1,6 +1,6 @@
 module github.com/kurtserdar/StealthWG/wgbind
 
-go 1.26.5
+go 1.25.0
 
 require (
 	github.com/kurtserdar/StealthWG/mask v0.0.0
