@@ -18,6 +18,9 @@ struct TunnelProfile: Identifiable, Equatable {
     let id: String
     let name: String
     let profile: StealthProfile
+    var onDemand: Bool = false      // manager.isOnDemandEnabled (always-on)
+    var killSwitch: Bool = false    // protocol.includeAllNetworks (full tunnel)
+    var allowLocal: Bool = false    // protocol.excludeLocalNetworks (LAN reachable)
 }
 
 /// Observable multi-profile wrapper the UI binds to. Each profile is a separate
@@ -70,7 +73,12 @@ final class TunnelManager: ObservableObject {
             let id = (proto.providerConfiguration?["profileID"] as? String) ?? UUID().uuidString
             managers[id] = m
             statuses[id] = m.connection.status
-            list.append(TunnelProfile(id: id, name: m.localizedDescription ?? "StealthWG", profile: parsed))
+            list.append(TunnelProfile(
+                id: id, name: m.localizedDescription ?? "StealthWG", profile: parsed,
+                onDemand: m.isOnDemandEnabled,
+                killSwitch: proto.includeAllNetworks,
+                allowLocal: proto.excludeLocalNetworks
+            ))
             observe(id: id, connection: m.connection)
         }
         profiles = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -124,6 +132,8 @@ final class TunnelManager: ObservableObject {
     }
 
     private func save(profile: StealthProfile, name: String, into m: NETunnelProviderManager, id: String) async throws {
+        // Preserve protocol-level hardening flags across a config rebuild (edit).
+        let existing = m.protocolConfiguration as? NETunnelProviderProtocol
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = TunnelConstants.tunnelBundleIdentifier
         proto.serverAddress = TunnelConstants.displayName
@@ -131,6 +141,8 @@ final class TunnelManager: ObservableObject {
         if let mask = profile.maskKey { pc["maskKey"] = mask }
         if !profile.endpoints.isEmpty { pc["endpoints"] = profile.endpoints }
         proto.providerConfiguration = pc
+        proto.includeAllNetworks = existing?.includeAllNetworks ?? false
+        proto.excludeLocalNetworks = existing?.excludeLocalNetworks ?? false
         m.protocolConfiguration = proto
         m.localizedDescription = name.isEmpty ? TunnelConstants.displayName : name
         m.isEnabled = true
@@ -173,6 +185,52 @@ final class TunnelManager: ObservableObject {
 
     func disconnect(id: String) {
         managers[id]?.connection.stopVPNTunnel()
+    }
+
+    // MARK: - VPN options (on-demand / kill switch)
+
+    func setOnDemand(id: String, enabled: Bool) async {
+        guard let m = managers[id] else { return }
+        do {
+            if enabled {
+                // Single always-on: turn on-demand off on every other profile first.
+                for (otherID, other) in managers where otherID != id && other.isOnDemandEnabled {
+                    other.isOnDemandEnabled = false
+                    try await other.saveToPreferences()
+                }
+                let rule = NEOnDemandRuleConnect()
+                rule.interfaceTypeMatch = .any
+                m.onDemandRules = [rule]
+                m.isOnDemandEnabled = true
+            } else {
+                m.isOnDemandEnabled = false
+            }
+            m.isEnabled = true
+            try await m.saveToPreferences()
+            await reloadAndSelect(preferID: id)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func setKillSwitch(id: String, enabled: Bool) async {
+        await setProtocolFlag(id: id) { $0.includeAllNetworks = enabled }
+    }
+
+    func setAllowLocal(id: String, enabled: Bool) async {
+        await setProtocolFlag(id: id) { $0.excludeLocalNetworks = enabled }
+    }
+
+    private func setProtocolFlag(id: String, _ apply: (NETunnelProviderProtocol) -> Void) async {
+        guard let m = managers[id], let proto = m.protocolConfiguration as? NETunnelProviderProtocol else { return }
+        apply(proto)
+        m.protocolConfiguration = proto
+        do {
+            try await m.saveToPreferences()
+            await reloadAndSelect(preferID: id)
+        } catch {
+            lastError = error.localizedDescription
+        }
     }
 
     func profileText(id: String) -> String? {
