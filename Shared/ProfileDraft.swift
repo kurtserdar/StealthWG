@@ -60,4 +60,39 @@ struct ProfileDraft {
         if eps.count > 1 { lines.append("Endpoints = \(eps.joined(separator: ", "))") }
         return lines.joined(separator: "\n") + "\n"
     }
+
+    /// Reverse of `build()` for our profile shape: line-scans the wg-quick config
+    /// into editable fields so an existing profile can be edited in the form.
+    static func from(_ profile: StealthProfile) -> ProfileDraft {
+        func field(_ key: String) -> String {
+            for line in profile.wgQuickConfig.split(separator: "\n") {
+                let s = line.trimmingCharacters(in: .whitespaces)
+                guard let eq = s.firstIndex(of: "=") else { continue }
+                if s[..<eq].trimmingCharacters(in: .whitespaces).caseInsensitiveCompare(key) == .orderedSame {
+                    return s[s.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+                }
+            }
+            return ""
+        }
+        var d = ProfileDraft()
+        d.privateKey = field("PrivateKey")
+        d.address = field("Address")
+        d.dns = field("DNS")
+        d.mtu = field("MTU")
+        d.serverPublicKey = field("PublicKey")
+        d.allowedIPs = field("AllowedIPs")
+        d.keepalive = field("PersistentKeepalive")
+        d.presharedKey = field("PresharedKey")
+        d.endpoint = profile.endpoints.first ?? field("Endpoint")
+        d.fallbackEndpoints = Array(profile.endpoints.dropFirst())
+        d.maskKey = profile.maskKey ?? ""
+        return d
+    }
+}
+
+/// Default display name for an imported profile: the endpoint host (no port).
+func defaultProfileName(for profile: StealthProfile) -> String {
+    guard let ep = profile.endpoints.first else { return "StealthWG" }
+    if let colon = ep.lastIndex(of: ":") { return String(ep[..<colon]) }
+    return ep
 }

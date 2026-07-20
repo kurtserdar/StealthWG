@@ -151,6 +151,20 @@ enum StealthProfileTests {
         check(bt.contains("PersistentKeepalive = 25"), "build includes keepalive default")
         check(!bt.contains("PresharedKey"), "build omits empty preshared key")
 
+        // ProfileDraft.from reverses build() for our shape.
+        var srcDraft = ProfileDraft.defaults()
+        srcDraft.privateKey = "+CzRHZBUtXJnt/TL+e2kKcfR5Vsd9qC4Ij+Eg4kaRko="
+        srcDraft.serverPublicKey = "SRV"; srcDraft.endpoint = "gw.example.com:51819"; srcDraft.maskKey = "MK"
+        srcDraft.fallbackEndpoints = ["gw.example.com:443"]; srcDraft.keepalive = "25"; srcDraft.dns = "1.1.1.1"
+        let backDraft = ProfileDraft.from(try! StealthProfile.parse(srcDraft.build()))
+        check(backDraft.privateKey == srcDraft.privateKey, "from: private key")
+        check(backDraft.serverPublicKey == "SRV", "from: server pubkey")
+        check(backDraft.endpoint == "gw.example.com:51819", "from: endpoint")
+        check(backDraft.fallbackEndpoints == ["gw.example.com:443"], "from: fallbacks")
+        check(backDraft.maskKey == "MK", "from: mask key")
+        check(backDraft.dns == "1.1.1.1", "from: dns")
+        check(defaultProfileName(for: try! StealthProfile.parse(srcDraft.build())) == "gw.example.com", "default name = endpoint host")
+
         // parseRuntimeStats: sums rx/tx across peers, reuses handshake parse.
         let uapi = """
         private_key=abc
