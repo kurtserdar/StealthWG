@@ -1,7 +1,11 @@
-# Only these Go modules are needed to build the gateway image.
+# Only these Go modules + the all-in-one entrypoint are needed to build the images.
 *
 !mask
 !quictransport
+!wgbind
 !gateway
-# Drop build artifacts that may exist in the working tree.
+!deploy/standalone/allinone
+# Drop build artifacts / runtime state that may exist in the working tree.
 gateway/stealthwg-gateway
+deploy/standalone/data
+deploy/standalone/profiles

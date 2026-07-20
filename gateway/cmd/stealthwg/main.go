@@ -132,7 +132,9 @@ func cmdInit(args []string) {
 	if err := saveConfig(cfg); err != nil {
 		fatal("save config: %v", err)
 	}
-	_ = exec.Command("systemctl", "enable", "--now", "stealthwg").Run()
+	if !noSystemd() {
+		_ = exec.Command("systemctl", "enable", "--now", "stealthwg").Run()
+	}
 	addClient(cfg, "client1")
 	fmt.Println("\nStealthWG is up. Add more devices with: sudo stealthwg add-client <name>")
 }
@@ -147,6 +149,25 @@ func cmdAddClient(args []string) {
 		fatal("load config (run 'stealthwg init' first): %v", err)
 	}
 	addClient(cfg, args[0])
+	reloadDaemon()
+}
+
+// noSystemd reports whether the CLI runs without systemd (containers), gated by
+// the STEALTHWG_NO_SYSTEMD environment variable.
+func noSystemd() bool { return os.Getenv("STEALTHWG_NO_SYSTEMD") != "" }
+
+// reloadDaemon reloads the running server after a config change. Under systemd it
+// asks systemctl; in a container it signals the daemon (PID 1) with SIGHUP, but
+// only when PID 1 is actually stealthwg — so it is a no-op during entrypoint
+// provisioning, when PID 1 is still the shell.
+func reloadDaemon() {
+	if noSystemd() {
+		if c, err := os.ReadFile("/proc/1/comm"); err == nil &&
+			strings.TrimSpace(string(c)) == "stealthwg" {
+			_ = syscall.Kill(1, syscall.SIGHUP)
+		}
+		return
+	}
 	_ = exec.Command("systemctl", "reload", "stealthwg").Run()
 }
 

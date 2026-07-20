@@ -95,42 +95,46 @@ public address.
 ## Standalone bundle — WireGuard included (no existing WG server)
 
 If you do **not** already run WireGuard, the standalone bundle in
-`deploy/standalone/` brings up the masking relay **and** a WireGuard server
-together, and prints a ready-to-import StealthWG client profile (with a QR code).
+`deploy/standalone/` runs **one all-in-one container** — the `stealthwg` binary
+with userspace WireGuard (wireguard-go) + masking + NAT in a single process — and
+prints a ready-to-import StealthWG client profile (with a QR code). No host kernel
+WireGuard is required.
 
 ```sh
 cd deploy/standalone
 cp .env.example .env
 # edit .env: set PUBLIC_HOST to your server's public IP or DNS name
 docker compose up -d
-docker compose logs wg      # shows the client profile + QR to scan on your phone
+docker compose logs stealthwg   # shows the client profile(s) + QR to scan
 ```
 
-Both images are published (`ghcr.io/kurtserdar/stealthwg-gateway` and
-`ghcr.io/kurtserdar/stealthwg-wg`), so `up` just pulls them — no local build.
-To build the WireGuard-server image from source instead, run
-`docker compose build`.
+The image is published (`ghcr.io/kurtserdar/stealthwg-allinone`), so `up` just
+pulls it; `docker compose build` rebuilds from source. Keys and the PSK persist in
+`deploy/standalone/data/` across restarts. Set `PEERS` before the first `up` for
+several clients, or add one later without downtime:
 
-Generated client profiles are also written to `deploy/standalone/profiles/`.
-Keys and the PSK persist in `deploy/standalone/data/` across restarts. To add
-more devices, set `PEERS` before the first `up` (or delete `data/` to
-reprovision). The host needs kernel WireGuard support (built into Linux 5.6+).
-
-The gateway container runs two listeners on the same upstream: the UDP mask on
-51819 and **QUIC** (HTTP/3-shaped) on 443 (`STEALTHWG_QUIC=:443` in the compose
-file). List both in the profile's `[Stealth]` section, marking the 443 endpoint
-with the `quic://` scheme so the client dials it over QUIC and falls back to the
-mask when needed:
-
-```
-[Stealth]
-MaskKey = <PSK>
-Endpoints = <PUBLIC_HOST>:51819, quic://<PUBLIC_HOST>:443
+```sh
+docker compose exec stealthwg stealthwg add-client laptop   # reloads the running server
 ```
 
-The client tries them in order and stays on the first that completes a handshake.
-For a QUIC-first profile, set `[Stealth] Transport = quic` and point
-`[Peer] Endpoint` at `<PUBLIC_HOST>:443`.
+The container needs `NET_ADMIN` and `/dev/net/tun` (already set in the compose
+file). To serve **QUIC** on 443 (HTTP/3-shaped) instead of the UDP mask, set
+`TRANSPORT=quic` and `LISTEN=443` in `.env`; the printed profile then carries
+`[Stealth] Transport = quic` + `SNI`.
+
+### Kernel-WireGuard variant (max throughput)
+
+Userspace wireguard-go is simple and portable but slower than kernel WireGuard. On
+a host that has kernel WG and wants maximum throughput, use the two-container
+variant (a kernel-WG server + the relay in front):
+
+```sh
+docker compose -f docker-compose.kernel-wg.yml up -d
+docker compose -f docker-compose.kernel-wg.yml logs wg
+```
+
+It publishes the mask on 51819 and QUIC on 443 via the relay, and needs kernel
+WireGuard support (Linux 5.6+).
 
 > QUIC prints a one-time warning about the UDP receive-buffer size in containers.
 > It is harmless; to silence it (and improve throughput) raise the host's

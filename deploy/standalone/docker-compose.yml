@@ -1,40 +1,32 @@
-# StealthWG standalone bundle: masking relay + bundled WireGuard server.
-# One command on a WG-less Linux host: `docker compose up -d`.
+# StealthWG standalone bundle — one all-in-one container: userspace WireGuard
+# (wireguard-go) + masking + NAT, terminated in a single process. No host kernel
+# WireGuard needed. One command on a WG-less Linux host: `docker compose up -d`.
+#
+# For maximum throughput on a host that HAS kernel WireGuard, use the two-container
+# kernel-WG variant instead: `docker compose -f docker-compose.kernel-wg.yml up -d`.
 services:
-  wg:
-    # Pulls the published image; `docker compose build` rebuilds from ./wg.
-    image: ghcr.io/kurtserdar/stealthwg-wg:latest
-    build: ./wg
+  stealthwg:
+    # Pulls the published image; `docker compose build` rebuilds from the repo.
+    image: ghcr.io/kurtserdar/stealthwg-allinone:latest
+    build:
+      context: ../..
+      dockerfile: deploy/standalone/allinone/Dockerfile
     restart: unless-stopped
     cap_add: ["NET_ADMIN"]
-    sysctls:
-      net.ipv4.ip_forward: "1"
     devices:
       - /dev/net/tun:/dev/net/tun
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    ports:
+      # The masked (or QUIC) WireGuard port. Set LISTEN=443 + TRANSPORT=quic for QUIC.
+      - "${LISTEN:-51820}:${LISTEN:-51820}/udp"
     environment:
       PUBLIC_HOST: "${PUBLIC_HOST:?set PUBLIC_HOST in .env}"
-      STEALTHWG_PSK: "${STEALTHWG_PSK:-}"
       PEERS: "${PEERS:-1}"
-      WG_SUBNET: "${WG_SUBNET:-10.0.0.0/24}"
-      WG_DNS: "${WG_DNS:-1.1.1.1}"
+      SUBNET: "${SUBNET:-10.8.0.0/24}"
+      DNS: "${DNS:-1.1.1.1}"
+      LISTEN: "${LISTEN:-51820}"
+      TRANSPORT: "${TRANSPORT:-mask}"
+      SNI: "${SNI:-}"
     volumes:
       - ./data:/data
-      - ./profiles:/profiles
-
-  # One gateway, two listeners on the same upstream: the UDP mask on 51819 and
-  # QUIC (HTTP/3-shaped) on 443. A client can dial either and fall back between
-  # them (profile: `Endpoints = <host>:51819, quic://<host>:443`).
-  gateway:
-    image: ghcr.io/kurtserdar/stealthwg-gateway:latest
-    restart: unless-stopped
-    depends_on:
-      - wg
-    ports:
-      - "51819:51819/udp"
-      - "443:443/udp"
-    environment:
-      STEALTHWG_UPSTREAM: "wg:51820"
-      STEALTHWG_PSK_FILE: "/data/psk"
-      STEALTHWG_QUIC: ":443"
-    volumes:
-      - ./data:/data:ro
