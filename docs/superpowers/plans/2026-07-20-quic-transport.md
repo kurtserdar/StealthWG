@@ -31,15 +31,15 @@
 
 **Files:** new module `quictransport/{go.mod,quic.go,quic_test.go}`.
 
-- [ ] **Step 1:** `go mod init github.com/kurtserdar/StealthWG/quictransport`; `go get github.com/quic-go/quic-go`.
-- [ ] **Step 2: Write failing test** `quic_test.go`: start a `Listen` on `127.0.0.1:0` with `SelfSignedCert`, `Dial` to it (sni "example.com"), send a datagram client→server and server→client, assert round-trip.
-- [ ] **Step 3: Implement** `quic.go`:
+- [x] **Step 1:** `go mod init github.com/kurtserdar/StealthWG/quictransport`; `go get github.com/quic-go/quic-go`.
+- [x] **Step 2: Write failing test** `quic_test.go`: start a `Listen` on `127.0.0.1:0` with `SelfSignedCert`, `Dial` to it (sni "example.com"), send a datagram client→server and server→client, assert round-trip.
+- [x] **Step 3: Implement** `quic.go`:
   - `SelfSignedCert() (tls.Certificate, error)` — ephemeral ed25519/ECDSA cert.
   - `type Session` wrapping `quic.Connection` with `SendDatagram([]byte) error`, `ReceiveDatagram(ctx) ([]byte, error)`.
   - `Dial(ctx, addr, sni string) (*Session, error)` — `quic.DialAddr` with `tls.Config{InsecureSkipVerify:true, ServerName:sni, NextProtos:["h3"]}`, `quic.Config{EnableDatagrams:true}`.
   - `Listen(addr string, cert tls.Certificate) (*Listener, error)` — `quic.ListenAddr` with datagrams; `Accept(ctx) (*Session, error)`.
-- [ ] **Step 4:** `cd quictransport && go test ./...` → ok; `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...`.
-- [ ] **Step 5: Commit.**
+- [x] **Step 4:** `cd quictransport && go test ./...` → ok; `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...`.
+- [x] **Step 5: Commit.**
 
 ---
 
@@ -47,7 +47,7 @@
 
 **Files:** `wgbind/quic_bind.go` (+ go.mod add quictransport + quic-go), `wgbind/quic_bind_test.go`.
 
-- [ ] QUICBind implements `conn.Bind`: `Open` dials the session lazily on first `Send`/from the configured endpoint; a receive func reads datagrams; `Send` writes a datagram; `ParseEndpoint`/`Close`/`SetMark`. Test: round-trip through a `quictransport.Listen` echo server (mirrors MaskBind's fake-gateway test). Cross-compile check.
+- [x] QUICBind implements `conn.Bind`: `Open` dials the session lazily on first `Send`/from the configured endpoint; a receive func reads datagrams; `Send` writes a datagram; `ParseEndpoint`/`Close`/`SetMark`. Test: round-trip through a `quictransport.Listen` echo server (mirrors MaskBind's fake-gateway test). Cross-compile check.
 
 ---
 
@@ -55,7 +55,7 @@
 
 **Files:** `Shared/StealthProfile.swift`, `Tests/StealthProfileTests.swift`.
 
-- [ ] Parse `[Stealth] Transport` (default `"mask"`) + `SNI`; add to the struct + `serialize`; round-trip test. Store both in `providerConfiguration` in `TunnelManager`.
+- [x] Parse `[Stealth] Transport` (default `"mask"`) + `SNI`; add to the struct + `serialize`; round-trip test. Store both in `providerConfiguration` in `TunnelManager`.
 
 ---
 
@@ -63,7 +63,7 @@
 
 **Files:** `gateway/internal/relay`, `gateway/internal/config`, `gateway/cmd/stealthwg-gateway`.
 
-- [ ] Add a QUIC listener (`STEALTHWG_QUIC=:443`): accept sessions, per-session forward each datagram to the upstream WG over UDP, relay replies back on the session (reuse the session/GC model). Runs alongside the mask listener. Go test with a loopback upstream.
+- [x] Add a QUIC listener (`STEALTHWG_QUIC=:443`): accept sessions, per-session forward each datagram to the upstream WG over UDP, relay replies back on the session (reuse the session/GC model). Runs alongside the mask listener. Go test with a loopback upstream.
 
 ---
 
@@ -71,7 +71,7 @@
 
 **Files:** `gateway/internal/wgserver/quicbind.go`, `engine.go`, `cmd/stealthwg`.
 
-- [ ] `QUICServerBind` (conn.Bind) over `quictransport.Listener`: map connection↔synthetic endpoint; receive tags datagrams, `Send` routes by endpoint. `engine.Start` uses it when `Transport==quic`; `stealthwg init --transport quic --listen 443`. Cross-compile check.
+- [x] `QUICServerBind` (conn.Bind) over `quictransport.Listener`: map connection↔synthetic endpoint; receive tags datagrams, `Send` routes by endpoint. `engine.Start` uses it when `Transport==quic`; `stealthwg init --transport quic --listen 443`. Cross-compile check.
 
 ---
 
@@ -79,7 +79,7 @@
 
 **Files:** `patches/wireguard-apple/0003-quic-transport.patch`, `scripts/setup-wireguard.sh`, `Tunnel/StealthBridge.h`, `Tunnel/PacketTunnelProvider.swift`.
 
-- [ ] Add `wgSetTransport(mode, sni)` export; `wgTurnOn` builds `QUICBind` when `mode=="quic"`. Bridge go.mod requires wgbind/quictransport/quic-go (replace paths). Swift passes transport+SNI from `providerConfiguration`. Unsigned iOS + macOS device builds green (libwg-go.a links QUIC).
+- [x] Add `wgSetTransport(mode, sni)` export; `wgTurnOn` builds `QUICBind` when `mode=="quic"`. Bridge go.mod requires wgbind/quictransport/quic-go (replace paths). Swift passes transport+SNI from `providerConfiguration`. Unsigned iOS + macOS device builds green (libwg-go.a links QUIC).
 
 ---
 
@@ -87,13 +87,13 @@
 
 **Files:** `App/Views/ProfileFormView.swift`, `App/Views/ProfileDetailView.swift`, fallback wiring.
 
-- [ ] Form: **Transport** picker (Mask/QUIC) + **SNI** (advanced), written into the built profile. Fallback endpoints carry a transport; the endpoint loop dials mask or QUIC accordingly (extend `PacketTunnelProvider` + `[Stealth] Endpoints` to allow a `quic://host:443` scheme). iOS + macOS builds green.
+- [x] Form: **Transport** picker (Mask/QUIC) + **SNI** (advanced), written into the built profile. Fallback endpoints carry a transport; the endpoint loop dials mask or QUIC accordingly (extend `PacketTunnelProvider` + `[Stealth] Endpoints` to allow a `quic://host:443` scheme). iOS + macOS builds green.
 
 ---
 
 ### Task 8: Full build + tests
 
-- [ ] `go test ./...` in quictransport/wgbind/gateway; `bash scripts/test-parser.sh`; unsigned iOS + macOS device builds; all green.
+- [x] `go test ./...` in quictransport/wgbind/gateway; `bash scripts/test-parser.sh`; unsigned iOS + macOS device builds; all green.
 
 ---
 

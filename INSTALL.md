@@ -116,6 +116,16 @@ sudo stealthwg add-client laptop
 Point the app's `[Peer] Endpoint` at `<public-host>:51820` (the port `init` uses)
 and forward that UDP port to the host.
 
+To run the server over **QUIC** instead of the UDP mask (blends with HTTP/3 on
+UDP 443):
+
+```sh
+sudo stealthwg init --public-host <ip-or-dns> --transport quic --sni www.cloudflare.com --listen 443
+```
+
+The printed client profile then carries `[Stealth] Transport = quic` and `SNI`,
+so the app dials it over QUIC automatically.
+
 ### Option B — Relay (front an existing WireGuard)
 
 If you already run WireGuard (kernel WG, MikroTik/RouterOS, wg-easy…), the relay
@@ -135,6 +145,10 @@ docker run -d --name stealthwg-gateway --restart unless-stopped \
 The client profile then uses `[Peer] Endpoint = <relay host>:51819` and
 `[Stealth] MaskKey = <the same PSK>`.
 
+To also accept **QUIC** clients on UDP 443, add `-p 443:443/udp` and
+`-e STEALTHWG_QUIC=:443`; the relay then runs the QUIC listener alongside the
+mask listener, both forwarding to the same upstream WireGuard.
+
 - **No WireGuard yet, but want Docker?** The `deploy/standalone/` compose bundle
   runs the relay **and** a bundled WireGuard server and prints a client profile.
 - **RouterOS / MikroTik (e.g. RB5009), Kubernetes, other container hosts?** Use the
@@ -152,6 +166,12 @@ The app imports a standard wg-quick config with a StealthWG `[Stealth]` section.
 PSK (base64), the same key the server runs with. Multiple endpoints (for automatic
 fallback, e.g. `:51819` and `:443`) go in `[Stealth] Endpoints`.
 
+`[Stealth] Transport` selects the transport: `mask` (UDP mask, the default) or
+`quic` (QUIC DATAGRAM on UDP 443, blending with HTTP/3). For `quic`, `SNI` sets
+the TLS server name the client presents. A fallback endpoint may override the
+transport with a `quic://` or `mask://` scheme (e.g. `quic://host:443`), so the
+app can try QUIC first and fall back to the UDP mask.
+
 ```ini
 [Interface]
 PrivateKey = <client private key>
@@ -167,7 +187,9 @@ PersistentKeepalive = 25
 
 [Stealth]
 MaskKey = <base64 PSK>
-Endpoints = <host>:51819, <host>:443
+Endpoints = <host>:51819, quic://<host>:443
+Transport = mask
+SNI = www.cloudflare.com
 ```
 
 Run the parser tests with `./scripts/test-parser.sh`; the gateway tests with

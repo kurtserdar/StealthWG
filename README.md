@@ -35,10 +35,13 @@ blocks plain WireGuard on every port.
 - **Cross-platform client** — native **iOS** and **macOS** apps sharing one code
   base (masking, connection, stats, profiles).
 - **Traffic masking** — the UdpMask codec turns WireGuard packets into
-  high-entropy noise; a pluggable `Obfuscator` seam leaves room for future
-  transports (e.g. QUIC).
+  high-entropy noise.
+- **Two transports** — the **UDP mask** (high-entropy noise on UDP) or **QUIC**
+  (WireGuard carried as QUIC DATAGRAM on UDP 443, blending with HTTP/3). Both run
+  client- and server-side; the profile picks one with `[Stealth] Transport`.
 - **Multiple endpoints with automatic fallback** — the client tries several server
-  endpoints (e.g. `:51819` then `:443`) until one completes a handshake.
+  endpoints (e.g. `:51819` then `:443`) until one completes a handshake, and can
+  even fall back across transports (`quic://host:443` then a mask endpoint).
 - **Multiple profiles + editing** — hold several servers, switch between them, edit
   in a structured form; generate a client keypair on device or paste your own.
 - **Kill switch + on-demand** — per profile: always-on auto-connect, route all
@@ -67,6 +70,12 @@ that makes the design simple:
 
 The mask codec is symmetric: the client seals what the server opens, and vice
 versa. All cryptographic security remains WireGuard's.
+
+The **QUIC** transport is a sibling of the mask: instead of masking each UDP
+datagram, `QUICBind` (client) and `QUICServerBind` (server) carry each WireGuard
+packet as a QUIC DATAGRAM frame over a real quic-go connection on UDP 443 (ALPN
+`h3`, self-signed TLS used only for blending). WireGuard is still the only
+authenticated crypto.
 
 ## Installation
 
@@ -142,10 +151,14 @@ sıkışmayı tamamladı ve canlı trafik (internet ve LAN) taşıdı.
 - **Çok platformlu istemci** — tek kod tabanını paylaşan native **iOS** ve **macOS**
   uygulamaları (maskeleme, bağlantı, istatistik, profiller).
 - **Trafik maskeleme** — UdpMask codec'i WireGuard paketlerini yüksek entropili
-  gürültüye çevirir; takılabilir bir `Obfuscator` arayüzü ileride yeni taşımalara
-  (ör. QUIC) yer bırakır.
+  gürültüye çevirir.
+- **İki taşıma** — **UDP mask** (UDP üzerinde yüksek entropili gürültü) veya
+  **QUIC** (WireGuard, UDP 443'te QUIC DATAGRAM olarak taşınır, HTTP/3 ile karışır).
+  İkisi de hem istemci hem sunucu tarafında çalışır; profil `[Stealth] Transport`
+  ile birini seçer.
 - **Çoklu endpoint + otomatik yedekleme** — istemci birden çok sunucu endpoint'ini
-  (ör. önce `:51819`, sonra `:443`) el sıkışma olana kadar sırayla dener.
+  (ör. önce `:51819`, sonra `:443`) el sıkışma olana kadar sırayla dener; hatta
+  taşımalar arası da yedekleyebilir (`quic://host:443`, sonra bir mask endpoint'i).
 - **Çoklu profil + düzenleme** — birden çok sunucu tut, aralarında geç, yapısal
   formda düzenle; cihazda anahtar üret ya da kendininkini yapıştır.
 - **Kill switch + on-demand** — profil başına: her zaman-açık otomatik bağlan, tüm
