@@ -92,6 +92,7 @@ targets:
       - macOS
       - path: App/Views
       - path: App/TunnelManager.swift
+      - path: App/DiagnosticsRunner.swift
       - path: App/Theme.swift
       - path: App/QRCodeView.swift
       - path: App/Platform.swift
