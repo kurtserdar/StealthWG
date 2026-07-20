@@ -198,9 +198,7 @@ needs `NET_ADMIN` + `/dev/net/tun` (already set in the compose file). Full refer
 
 > Choosing between A and B? Both stand up the same all-in-one masked WireGuard
 > (userspace `wireguard-go`). **A** is a native binary (no Docker); **B** is one
-> Docker container. Same client profile either way. On a host with kernel WireGuard
-> that wants max throughput, B also has a two-container **kernel-WG variant**
-> (`docker compose -f docker-compose.kernel-wg.yml up -d`).
+> Docker container. Same client profile either way.
 
 ### Option C — Relay image (you already run WireGuard)
 
@@ -278,4 +276,3 @@ Run the parser tests with `./scripts/test-parser.sh`; the gateway tests with
 | Already run WireGuard | **Relay** pointed at your WireGuard |
 | RouterOS / MikroTik / Kubernetes | **Relay** container image |
 | Fresh host, want Docker | **Standalone compose bundle** (one all-in-one container) |
-| High throughput / many clients | Standalone **kernel-WG variant** (`docker-compose.kernel-wg.yml`) — kernel WG is faster than userspace |

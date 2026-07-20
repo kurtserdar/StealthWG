@@ -111,7 +111,7 @@ or B; if yes, pick C.
   program, run `stealthwg init`, done. WireGuard **and** the masking live inside it.
 - **B — "Empty server, but I like Docker."** `docker compose up` brings up **one
   all-in-one container** (WireGuard + masking, userspace). Same result as A, in
-  Docker. (A kernel-WG variant exists for max throughput.)
+  Docker.
 - **C — "I already run WireGuard and don't want to touch it."** Install **only the
   masker box** and point it at your WireGuard. It masks in front — it does **not**
   start a second WireGuard.
@@ -259,7 +259,7 @@ kaldırılması. Derin sunucu referansı: **[docs/deploy-gateway.md](docs/deploy
   içinde.
 - **B — "Boş sunucu ama Docker'ı severim."** `docker compose up` dersin; sana **tek
   all-in-one container** açar (WireGuard + maskeleme, userspace). Sonuç A ile aynı,
-  Docker'da. (Yüksek performans için kernel-WG variant'ı da var.)
+  Docker'da.
 - **C — "Zaten WireGuard'ım var, ona dokunmayayım."** Sadece **maskeleyici kutuyu**
   kurarsın, "benim WG'm şurada" dersin; önüne geçip maskeler. **Yeni WireGuard
   kurmaz.**

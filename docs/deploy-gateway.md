@@ -122,20 +122,6 @@ file). To serve **QUIC** on 443 (HTTP/3-shaped) instead of the UDP mask, set
 `TRANSPORT=quic` and `LISTEN=443` in `.env`; the printed profile then carries
 `[Stealth] Transport = quic` + `SNI`.
 
-### Kernel-WireGuard variant (max throughput)
-
-Userspace wireguard-go is simple and portable but slower than kernel WireGuard. On
-a host that has kernel WG and wants maximum throughput, use the two-container
-variant (a kernel-WG server + the relay in front):
-
-```sh
-docker compose -f docker-compose.kernel-wg.yml up -d
-docker compose -f docker-compose.kernel-wg.yml logs wg
-```
-
-It publishes the mask on 51819 and QUIC on 443 via the relay, and needs kernel
-WireGuard support (Linux 5.6+).
-
 > QUIC prints a one-time warning about the UDP receive-buffer size in containers.
 > It is harmless; to silence it (and improve throughput) raise the host's
 > `net.core.rmem_max`/`wmem_max` to 7 MiB.

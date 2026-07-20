@@ -1,9 +1,6 @@
 # StealthWG standalone bundle — one all-in-one container: userspace WireGuard
 # (wireguard-go) + masking + NAT, terminated in a single process. No host kernel
 # WireGuard needed. One command on a WG-less Linux host: `docker compose up -d`.
-#
-# For maximum throughput on a host that HAS kernel WireGuard, use the two-container
-# kernel-WG variant instead: `docker compose -f docker-compose.kernel-wg.yml up -d`.
 services:
   stealthwg:
     # Pulls the published image; `docker compose build` rebuilds from the repo.
