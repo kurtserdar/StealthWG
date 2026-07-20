@@ -93,6 +93,25 @@ struct ToggleVPNIntent: AppIntent {
     }
 }
 
+/// Set-value intent for the Control Center toggle (true = connect, false = disconnect).
+struct SetVPNIntent: SetValueIntent {
+    static var title: LocalizedStringResource = "Set StealthWG"
+    @Parameter(title: "Masked") var value: Bool
+
+    func perform() async throws -> some IntentResult {
+        let m = try await targetManager(nil)
+        if value {
+            m.isEnabled = true
+            try await m.saveToPreferences()
+            try await m.loadFromPreferences()
+            try (m.connection as? NETunnelProviderSession)?.startTunnel()
+        } else {
+            m.connection.stopVPNTunnel()
+        }
+        return .result()
+    }
+}
+
 struct StealthShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: ToggleVPNIntent(), phrases: ["Toggle \(.applicationName)"],

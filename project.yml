@@ -50,6 +50,24 @@ targets:
     dependencies:
       - target: PacketTunnel
         embed: true
+      - target: StealthWGWidgets
+        embed: true
+
+  # ── WidgetKit extension (Shortcuts surfaces + Home Screen widgets) ──────────
+  StealthWGWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - StealthWGWidgets
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stealthwg.widgets
+        PRODUCT_NAME: StealthWGWidgets
+        CODE_SIGN_ENTITLEMENTS: StealthWGWidgets/StealthWGWidgets.entitlements
+        INFOPLIST_FILE: StealthWGWidgets/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
 
   # ── Packet Tunnel network extension ────────────────────────────────────────
   PacketTunnel:
