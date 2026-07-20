@@ -245,6 +245,27 @@ enum StealthProfileTests {
         check(summQ.transport == "quic", "summary quic transport")
         check(summQ.sni == "www.cloudflare.com", "summary quic sni")
 
+        // LogRingBuffer: monotonic seq, capacity eviction, since-cursor, clear.
+        let d0 = Date(timeIntervalSince1970: 0)
+        let rb = LogRingBuffer(capacity: 3)
+        check(rb.latestCursor() == 0, "empty buffer cursor is 0")
+        rb.append("a", at: d0); rb.append("b", at: d0); rb.append("c", at: d0)
+        check(rb.count == 3, "buffer holds 3")
+        check(rb.latestCursor() == 3, "cursor tracks max seq")
+        check(rb.entries(since: 0).map(\.message) == ["a", "b", "c"], "since 0 returns all")
+        check(rb.entries(since: 2).map(\.message) == ["c"], "since 2 returns only newer")
+        check(rb.entries(since: 3).isEmpty, "since latest returns none")
+        rb.append("d", at: d0)   // evicts "a" (capacity 3)
+        check(rb.count == 3, "capacity caps count")
+        check(rb.entries(since: 0).map(\.message) == ["b", "c", "d"], "oldest evicted")
+        check(rb.entries(since: 3).map(\.message) == ["d"], "cursor survives eviction")
+        check(rb.entries(since: 0).map(\.seq) == [2, 3, 4], "seq keeps increasing after eviction")
+        rb.clear()
+        check(rb.count == 0, "clear empties buffer")
+        check(rb.latestCursor() == 4, "clear keeps the cursor monotonic")
+        rb.append("e", at: d0)
+        check(rb.entries(since: 4).map(\.message) == ["e"], "append after clear continues seq")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
