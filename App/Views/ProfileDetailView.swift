@@ -89,6 +89,13 @@ struct ProfileDetailView: View {
                     }
                 }
                 .tint(Theme.accent)
+                Section("Diagnostics") {
+                    NavigationLink {
+                        LogView()
+                    } label: {
+                        Label("Connection log", systemImage: "text.alignleft")
+                    }
+                }
                 Section {
                     Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
                     Button { showQR = true } label: { Label("Show QR", systemImage: "qrcode") }
