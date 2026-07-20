@@ -27,6 +27,27 @@ packages:
   WireGuardKit:
     path: ThirdParty/wireguard-apple
 
+# Explicit shared schemes so the app schemes are written to disk and always show
+# in Xcode's scheme picker (otherwise they are only Xcode-autocreated and can go
+# missing after a regenerate).
+schemes:
+  StealthWG:
+    build:
+      targets:
+        StealthWG: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  StealthWG-mac:
+    build:
+      targets:
+        StealthWG-mac: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+
 targets:
   # ── iOS application ────────────────────────────────────────────────────────
   StealthWG:
