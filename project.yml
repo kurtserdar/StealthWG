@@ -112,6 +112,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: StealthWG
         INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_NSSystemExtensionUsageDescription: StealthWG installs a network extension to mask and route your VPN traffic.
     dependencies:
       - target: PacketTunnel-mac
         embed: true
