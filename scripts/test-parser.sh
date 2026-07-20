@@ -16,6 +16,7 @@ swiftc -o "$BIN" \
     "$ROOT/Shared/ProfileDraft.swift" \
     "$ROOT/Shared/LogEntry.swift" \
     "$ROOT/Shared/LogRingBuffer.swift" \
+    "$ROOT/Shared/ConnectionDiagnostics.swift" \
     "$ROOT/Tests/StealthProfileTests.swift"
 
 "$BIN"

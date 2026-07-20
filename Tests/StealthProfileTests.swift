@@ -266,6 +266,39 @@ enum StealthProfileTests {
         rb.append("e", at: d0)
         check(rb.entries(since: 4).map(\.message) == ["e"], "append after clear continues seq")
 
+        // Connection diagnostics: targets, host/port split, live-status upgrade.
+        let diagRaw = """
+        [Interface]
+        PrivateKey = aaaa
+
+        [Peer]
+        PublicKey = bbbb
+        Endpoint = gw.example.com:51819
+        AllowedIPs = 0.0.0.0/0
+
+        [Stealth]
+        MaskKey = kkkk
+        Endpoints = gw.example.com:51819, quic://gw.example.com:443
+        """
+        let diagProfile = try! StealthProfile.parse(diagRaw)
+        let targets = diagnosticTargets(for: diagProfile)
+        check(targets.map(\.hostPort) == ["gw.example.com:51819", "gw.example.com:443"], "targets from endpoints")
+        check(targets[0].transport == "mask" && targets[1].transport == "quic", "target transports (default + scheme)")
+        check(targets[1].host == "gw.example.com" && targets[1].port == 443, "host/port split on last colon")
+
+        let seeded = targets.map { DiagnosticResult(target: $0, status: .needsTunnel) }
+        let live = applyLiveStatus(seeded, activeEndpoint: "gw.example.com:51819", handshakeRecent: true)
+        check(live[0].status == .reachableViaTunnel, "active mask endpoint upgraded via live tunnel")
+        check(live[1].status == .needsTunnel, "non-active endpoint untouched")
+        let noLive = applyLiveStatus(seeded, activeEndpoint: "gw.example.com:51819", handshakeRecent: false)
+        check(noLive[0].status == .needsTunnel, "no upgrade without a recent handshake")
+        let quicSeed = [DiagnosticResult(target: targets[1], status: .reachableQUIC(rttMillis: 42))]
+        check(applyLiveStatus(quicSeed, activeEndpoint: "gw.example.com:443", handshakeRecent: true)[0].status == .reachableQUIC(rttMillis: 42), "QUIC result untouched by live status")
+
+        check(DiagnosticStatus.reachableQUIC(rttMillis: 12).label == "Reachable · 12 ms", "quic label with rtt")
+        check(DiagnosticStatus.needsTunnel.symbol == "info.circle", "needsTunnel symbol")
+        check(diagnosticsSummary(live).contains("MASK  gw.example.com:51819  —  Reachable (live tunnel)"), "summary line format")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
