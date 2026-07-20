@@ -319,6 +319,15 @@ enum StealthProfileTests {
         check(onDemandRuleSpecs(trustedSSIDs: [" Home ", "", "Home"], trustCellular: false)[0].ssids == ["Home"],
               "blank dropped and ssids de-duplicated/trimmed")
 
+        // WidgetSnapshot: labels/accents per state + Codable round-trip.
+        check(WidgetSnapshot.empty.state == .exposed, "empty snapshot is exposed")
+        check(WidgetSnapshot(state: .masked).statusLabel == "Masked" && WidgetSnapshot(state: .masked).accentName == "teal", "masked -> teal")
+        check(WidgetSnapshot(state: .masking).statusLabel == "Masking…" && WidgetSnapshot(state: .masking).accentName == "amber", "masking -> amber")
+        check(WidgetSnapshot(state: .exposed).accentName == "coral", "exposed -> coral")
+        let snap = WidgetSnapshot(state: .masked, profileName: "Home", transport: "quic", endpoint: "gw:443", rxRate: 1200, txRate: 340, connectedSince: nil, lastHandshakeSeconds: 8)
+        let round = try! JSONDecoder().decode(WidgetSnapshot.self, from: try! JSONEncoder().encode(snap))
+        check(round == snap, "snapshot Codable round-trips")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
