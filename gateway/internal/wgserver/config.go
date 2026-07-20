@@ -15,6 +15,9 @@ type Client struct {
 	Address   string // e.g. 10.8.0.2/32
 }
 
+// DefaultTransport is the transport used when a config omits Transport.
+const DefaultTransport = "mask"
+
 // Config is the persisted server state (/etc/stealthwg/server.conf).
 type Config struct {
 	PrivateKey string // base64 server private key
@@ -23,7 +26,17 @@ type Config struct {
 	Subnet     string // e.g. 10.8.0.0/24 (assumed /24)
 	PublicHost string
 	DNS        string
+	Transport  string // "mask" (UDP mask, default) or "quic"
+	SNI        string // TLS SNI presented by the QUIC transport (quic only)
 	Clients    []Client
+}
+
+// TransportOrDefault returns the transport, defaulting to mask when empty.
+func (c *Config) TransportOrDefault() string {
+	if c.Transport == "" {
+		return DefaultTransport
+	}
+	return c.Transport
 }
 
 // Marshal renders the config file text.
@@ -35,6 +48,12 @@ func (c *Config) Marshal() string {
 	fmt.Fprintf(&b, "Subnet = %s\n", c.Subnet)
 	fmt.Fprintf(&b, "PublicHost = %s\n", c.PublicHost)
 	fmt.Fprintf(&b, "DNS = %s\n", c.DNS)
+	if c.Transport != "" && c.Transport != DefaultTransport {
+		fmt.Fprintf(&b, "Transport = %s\n", c.Transport)
+	}
+	if c.SNI != "" {
+		fmt.Fprintf(&b, "SNI = %s\n", c.SNI)
+	}
 	for _, cl := range c.Clients {
 		fmt.Fprintf(&b, "\n[Client %q]\nPublicKey = %s\nAddress = %s\n", cl.Name, cl.PublicKey, cl.Address)
 	}
@@ -83,6 +102,10 @@ func ParseConfig(s string) (*Config, error) {
 			c.PublicHost = v
 		case "DNS":
 			c.DNS = v
+		case "Transport":
+			c.Transport = v
+		case "SNI":
+			c.SNI = v
 		}
 	}
 	return c, sc.Err()

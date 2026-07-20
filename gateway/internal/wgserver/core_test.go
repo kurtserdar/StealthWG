@@ -34,6 +34,28 @@ func TestConfigRoundTrip(t *testing.T) {
 		got.Clients[0].Name != "phone" || got.Clients[0].Address != "10.8.0.2/32" {
 		t.Fatalf("round trip mismatch: %+v", got)
 	}
+	if got.TransportOrDefault() != "mask" {
+		t.Fatalf("default transport should be mask, got %q", got.TransportOrDefault())
+	}
+}
+
+func TestConfigQUICRoundTrip(t *testing.T) {
+	c := &Config{PrivateKey: "PRIV", MaskKey: "PSK", ListenPort: 443,
+		Subnet: "10.8.0.0/24", PublicHost: "vpn.example.com", DNS: "1.1.1.1",
+		Transport: "quic", SNI: "www.cloudflare.com"}
+	got, err := ParseConfig(c.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Transport != "quic" || got.SNI != "www.cloudflare.com" {
+		t.Fatalf("quic round trip mismatch: %+v", got)
+	}
+	p := got.ClientProfile("CPRIV", "10.8.0.2/32")
+	for _, want := range []string{"Transport = quic", "SNI = www.cloudflare.com", "Endpoint = vpn.example.com:443"} {
+		if !strings.Contains(p, want) {
+			t.Fatalf("quic profile missing %q\n%s", want, p)
+		}
+	}
 }
 
 func TestNextClientAddress(t *testing.T) {

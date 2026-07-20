@@ -21,5 +21,11 @@ func (c *Config) ClientProfile(clientPrivateKey, address string) string {
 	fmt.Fprintf(&b, "Endpoint = %s:%d\n", c.PublicHost, c.ListenPort)
 	b.WriteString("AllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n\n[Stealth]\n")
 	fmt.Fprintf(&b, "MaskKey = %s\n", c.MaskKey)
+	if c.TransportOrDefault() == "quic" {
+		b.WriteString("Transport = quic\n")
+		if c.SNI != "" {
+			fmt.Fprintf(&b, "SNI = %s\n", c.SNI)
+		}
+	}
 	return b.String()
 }

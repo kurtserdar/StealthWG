@@ -97,7 +97,13 @@ func cmdInit(args []string) {
 	subnet := fs.String("subnet", "10.8.0.0/24", "tunnel subnet (/24)")
 	dns := fs.String("dns", "1.1.1.1", "client DNS")
 	listen := fs.Int("listen", 51820, "WireGuard UDP port")
+	transport := fs.String("transport", "mask", "transport: mask (UDP mask) or quic")
+	sni := fs.String("sni", "", "TLS SNI presented by the QUIC transport (quic only)")
 	_ = fs.Parse(args)
+
+	if *transport != "mask" && *transport != "quic" {
+		fatal("--transport must be 'mask' or 'quic'")
+	}
 
 	if _, err := os.Stat(configPath()); err == nil {
 		fatal("config already exists at %s (use add-client, or remove it to re-init)", configPath())
@@ -121,6 +127,7 @@ func cmdInit(args []string) {
 	cfg := &wgserver.Config{
 		PrivateKey: priv, MaskKey: psk, ListenPort: *listen,
 		Subnet: *subnet, PublicHost: ph, DNS: *dns,
+		Transport: *transport, SNI: *sni,
 	}
 	if err := saveConfig(cfg); err != nil {
 		fatal("save config: %v", err)

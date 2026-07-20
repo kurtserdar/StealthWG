@@ -49,12 +49,13 @@ func (b *QUICBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 }
 
 // Send dials the QUIC session lazily (once) to the peer endpoint, then sends buf
-// as a datagram.
+// as a datagram. quic-go retains the slice until it is packed, and wireguard-go
+// reuses its buffer after Send returns, so copy.
 func (b *QUICBind) Send(buf []byte, ep conn.Endpoint) error {
 	if err := b.ensureSession(ep); err != nil {
 		return err
 	}
-	return b.sess.SendDatagram(buf)
+	return b.sess.SendDatagram(append([]byte(nil), buf...))
 }
 
 func (b *QUICBind) ensureSession(ep conn.Endpoint) error {

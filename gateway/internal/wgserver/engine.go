@@ -30,13 +30,9 @@ type Engine struct {
 
 // Start brings up the TUN, the masked WireGuard device, and NAT for cfg.
 func (e *Engine) Start(cfg *Config) error {
-	pskBytes, err := base64.StdEncoding.DecodeString(cfg.MaskKey)
+	bind, err := e.buildBind(cfg)
 	if err != nil {
-		return fmt.Errorf("mask key: %w", err)
-	}
-	codec, err := mask.NewCodec(pskBytes, padMax)
-	if err != nil {
-		return fmt.Errorf("codec: %w", err)
+		return err
 	}
 
 	tunDev, err := tun.CreateTUN(ifaceName, ifaceMTU)
@@ -46,7 +42,7 @@ func (e *Engine) Start(cfg *Config) error {
 	e.tun = tunDev
 
 	logger := device.NewLogger(device.LogLevelError, "stealthwg: ")
-	e.dev = device.NewDevice(tunDev, wgbind.New(conn.NewStdNetBind(), codec), logger)
+	e.dev = device.NewDevice(tunDev, bind, logger)
 
 	uapi, err := cfg.IpcConfig()
 	if err != nil {
@@ -62,6 +58,23 @@ func (e *Engine) Start(cfg *Config) error {
 	e.subnet = cfg.Subnet
 	e.wan = defaultWANInterface()
 	return e.applyNetworking()
+}
+
+// buildBind selects the transport bind: QUIC when configured, otherwise the UDP
+// mask bind.
+func (e *Engine) buildBind(cfg *Config) (conn.Bind, error) {
+	if cfg.TransportOrDefault() == "quic" {
+		return NewQUICServerBind(fmt.Sprintf(":%d", cfg.ListenPort)), nil
+	}
+	pskBytes, err := base64.StdEncoding.DecodeString(cfg.MaskKey)
+	if err != nil {
+		return nil, fmt.Errorf("mask key: %w", err)
+	}
+	codec, err := mask.NewCodec(pskBytes, padMax)
+	if err != nil {
+		return nil, fmt.Errorf("codec: %w", err)
+	}
+	return wgbind.New(conn.NewStdNetBind(), codec), nil
 }
 
 // Reload re-applies the peer set without restarting the tunnel.
