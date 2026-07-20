@@ -32,10 +32,20 @@ final class TunnelManager: ObservableObject {
     @Published private(set) var stats: ConnectionStats?
     @Published private(set) var lastError: String?
     @Published var selectedID: String?
+    @Published private(set) var logLines: [LogEntry] = []
 
     private var managers: [String: NETunnelProviderManager] = [:]
     private var observers: [NSObjectProtocol] = []
     private var statsTimer: Timer?
+    private var logTimer: Timer?
+    private var logCursor = 0
+
+    /// Persisted app setting: when off, the extension keeps no log buffer. Read at
+    /// tunnel start via providerConfiguration.
+    var loggingEnabled: Bool {
+        get { (UserDefaults.standard.object(forKey: "loggingEnabled") as? Bool) ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "loggingEnabled") }
+    }
     private var lastSample: (rx: Int64, tx: Int64, at: Date)?
     private var connectedSince: Date?
 
@@ -146,6 +156,7 @@ final class TunnelManager: ObservableObject {
         if !profile.endpoints.isEmpty { pc["endpoints"] = profile.endpoints }
         if profile.transport != StealthProfile.defaultTransport { pc["transport"] = profile.transport }
         if let sni = profile.sni { pc["sni"] = sni }
+        pc["loggingEnabled"] = loggingEnabled
         proto.providerConfiguration = pc
         proto.includeAllNetworks = existing?.includeAllNetworks ?? false
         proto.excludeLocalNetworks = existing?.excludeLocalNetworks ?? false
@@ -255,6 +266,9 @@ final class TunnelManager: ObservableObject {
             connectedSince = nil
             lastSample = nil
             stats = nil
+            stopLogPolling()
+            logLines.removeAll()
+            logCursor = 0
         }
     }
 
@@ -287,6 +301,66 @@ final class TunnelManager: ObservableObject {
         } catch {
             // Transient; retry next tick.
         }
+    }
+
+    // MARK: - Ephemeral log polling
+
+    /// Starts polling the connected tunnel's log buffer (call when the Log view
+    /// appears). No-op if nothing is connected.
+    func startLogPolling() {
+        stopLogPolling()
+        guard connectedID != nil else { return }
+        logTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.pollLogs()
+        }
+        pollLogs()
+    }
+
+    func stopLogPolling() {
+        logTimer?.invalidate()
+        logTimer = nil
+    }
+
+    private func pollLogs() {
+        guard
+            let id = connectedID,
+            let session = managers[id]?.connection as? NETunnelProviderSession
+        else { return }
+        do {
+            try session.sendProviderMessage(Data("logs:\(logCursor)".utf8)) { [weak self] response in
+                guard
+                    let response,
+                    let obj = try? JSONSerialization.jsonObject(with: response) as? [String: Any],
+                    let raw = obj["lines"] as? [[String: Any]]
+                else { return }
+                let newLines = raw.compactMap { d -> LogEntry? in
+                    guard let seq = d["seq"] as? Int, let msg = d["msg"] as? String else { return nil }
+                    let ts = d["ts"] as? Double ?? 0
+                    return LogEntry(seq: seq, date: Date(timeIntervalSince1970: ts), message: msg)
+                }
+                let cursor = obj["cursor"] as? Int ?? self?.logCursor ?? 0
+                Task { @MainActor in self?.appendLogLines(newLines, cursor: cursor) }
+            }
+        } catch {
+            // Transient; retry next tick.
+        }
+    }
+
+    @MainActor
+    private func appendLogLines(_ newLines: [LogEntry], cursor: Int) {
+        guard !newLines.isEmpty else { return }
+        logLines.append(contentsOf: newLines)
+        if logLines.count > 1000 { logLines.removeFirst(logLines.count - 1000) }
+        logCursor = max(logCursor, cursor)
+    }
+
+    /// Clears the extension buffer and the local copy.
+    func clearLogs() {
+        if let id = connectedID, let session = managers[id]?.connection as? NETunnelProviderSession {
+            try? session.sendProviderMessage(Data("logs:clear".utf8)) { _ in }
+        }
+        logLines.removeAll()
+        logCursor = 0
     }
 
     private func updateStats(_ p: RuntimeStats, activeEndpoint: String?, isFallback: Bool) {
