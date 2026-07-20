@@ -131,22 +131,24 @@ need).
 One self-contained binary that terminates a masked WireGuard tunnel (embedded
 wireguard-go + masking) — no `wireguard-tools`, no Docker, no existing WireGuard.
 
-Build the packages from source (or download release files):
+Download the `.deb` / `.rpm` / `.apk` for your arch from the
+[**latest release**](https://github.com/kurtserdar/StealthWG/releases/latest), or
+build from source:
 
 ```sh
 go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-./scripts/build-packages.sh          # → dist/*.deb *.rpm *.apk (+ raw binaries)
+VERSION=0.2.0 ./scripts/build-packages.sh   # → dist/*.deb *.rpm *.apk (+ raw binaries)
 ```
 
 Install and initialise:
 
 ```sh
 # Debian / Ubuntu
-sudo apt install ./dist/stealthwg_0.1.0_amd64.deb
+sudo apt install ./stealthwg_0.2.0_amd64.deb
 # Fedora / RHEL / Rocky / Alma
-sudo dnf install ./dist/stealthwg-0.1.0-1.x86_64.rpm
+sudo dnf install ./stealthwg-0.2.0-1.x86_64.rpm
 # Alpine
-sudo apk add --allow-untrusted ./dist/stealthwg_0.1.0_x86_64.apk
+sudo apk add --allow-untrusted ./stealthwg_0.2.0_x86_64.apk
 
 sudo stealthwg init --public-host <your-public-ip-or-dns>
 ```
