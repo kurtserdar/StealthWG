@@ -9,6 +9,10 @@ struct TrustedNetworksView: View {
     @State private var ssids: [String]
     @State private var trustCellular: Bool
     @State private var newSSID = ""
+    @State private var wifiNote = ""
+    #if os(iOS)
+    @StateObject private var currentWiFi = CurrentWiFi()
+    #endif
 
     init(profileID: String, ssids: [String], trustCellular: Bool) {
         self.profileID = profileID
@@ -35,14 +39,22 @@ struct TrustedNetworksView: View {
                 .onDelete { idx in
                     ssids.remove(atOffsets: idx); apply()
                 }
+                #if os(iOS)
+                Button {
+                    addCurrentWiFi()
+                } label: {
+                    Label("Use current Wi-Fi", systemImage: "wifi")
+                }
+                if !wifiNote.isEmpty {
+                    Text(wifiNote).font(.caption2).foregroundStyle(.secondary)
+                }
+                #endif
                 HStack {
                     TextField("Wi-Fi network name (SSID)", text: $newSSID)
                         .noAutocap()
                     Button("Add") {
-                        let t = newSSID.trimmingCharacters(in: .whitespaces)
-                        if !t.isEmpty, !ssids.contains(t) { ssids.append(t) }
+                        add(newSSID)
                         newSSID = ""
-                        apply()
                     }.disabled(newSSID.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
@@ -51,7 +63,30 @@ struct TrustedNetworksView: View {
         .inlineNavTitle()
     }
 
+    private func add(_ name: String) {
+        let t = name.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, !ssids.contains(t) else { return }
+        ssids.append(t)
+        apply()
+    }
+
     private func apply() {
         Task { await tunnelManager.setTrustedNetworks(id: profileID, ssids: ssids, trustCellular: trustCellular) }
     }
+
+    #if os(iOS)
+    private func addCurrentWiFi() {
+        wifiNote = ""
+        currentWiFi.fetch { result in
+            switch result {
+            case .success(let ssid):
+                add(ssid)
+            case .denied:
+                wifiNote = "Allow location access to read the current Wi-Fi name, or type it below."
+            case .unavailable:
+                wifiNote = "Couldn't read the current Wi-Fi. Type the name below."
+            }
+        }
+    }
+    #endif
 }
