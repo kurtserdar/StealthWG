@@ -51,6 +51,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
+        // Select the transport (UDP mask vs QUIC) before the device is created.
+        let transport = (providerConfiguration["transport"] as? String) ?? "mask"
+        let sni = (providerConfiguration["sni"] as? String) ?? ""
+        _ = wgSetTransport(transport, sni)
+
         adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
             if adapterError == nil { self?.startFallbackPolling() }
             completionHandler(adapterError)

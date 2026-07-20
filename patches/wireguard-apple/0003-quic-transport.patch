@@ -1,0 +1,79 @@
+diff --git a/Sources/WireGuardKitGo/api-apple.go b/Sources/WireGuardKitGo/api-apple.go
+index 22863b1..6f08141 100644
+--- a/Sources/WireGuardKitGo/api-apple.go
++++ b/Sources/WireGuardKitGo/api-apple.go
+@@ -111,6 +111,22 @@ func wgSetStealthKey(keyBase64 *C.char) int32 {
+ 	return 0
+ }
+ 
++// stealthTransport selects the tunnel transport: "" or "mask" use the UdpMask
++// bind (when a key is set); "quic" uses the QUIC datagram bind with stealthSNI.
++// Both are set before wgTurnOn and read when the device is created; turn-on is
++// sequential, so package globals are safe.
++var (
++	stealthTransport string
++	stealthSNI       string
++)
++
++//export wgSetTransport
++func wgSetTransport(mode *C.char, sni *C.char) int32 {
++	stealthTransport = C.GoString(mode)
++	stealthSNI = C.GoString(sni)
++	return 0
++}
++
+ //export wgTurnOn
+ func wgTurnOn(settings *C.char, tunFd int32) int32 {
+ 	logger := &device.Logger{
+@@ -137,7 +153,10 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
+ 	}
+ 	logger.Verbosef("Attaching to interface")
+ 	var bind conn.Bind = conn.NewStdNetBind()
+-	if stealthCodec != nil {
++	if stealthTransport == "quic" {
++		bind = wgbind.NewQUIC(stealthSNI)
++		logger.Verbosef("StealthWG: QUIC transport enabled")
++	} else if stealthCodec != nil {
+ 		bind = wgbind.New(bind, stealthCodec)
+ 		logger.Verbosef("StealthWG: UdpMask bind enabled")
+ 	}
+diff --git a/Sources/WireGuardKitGo/go.mod b/Sources/WireGuardKitGo/go.mod
+index c424ca2..265a96f 100644
+--- a/Sources/WireGuardKitGo/go.mod
++++ b/Sources/WireGuardKitGo/go.mod
+@@ -1,6 +1,6 @@
+ module golang.zx2c4.com/wireguard/apple
+ 
+-go 1.25.0
++go 1.26.5
+ 
+ require (
+ 	golang.org/x/sys v0.47.0
+@@ -9,12 +9,17 @@ require (
+ 
+ require (
+ 	github.com/kurtserdar/StealthWG/mask v0.0.0
++	github.com/kurtserdar/StealthWG/quictransport v0.0.0
+ 	github.com/kurtserdar/StealthWG/wgbind v0.0.0
+ 	golang.org/x/crypto v0.54.0 // indirect
+ 	golang.org/x/net v0.56.0 // indirect
+ 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+ )
+ 
++require github.com/quic-go/quic-go v0.60.0 // indirect
++
+ replace github.com/kurtserdar/StealthWG/mask => ../../../../mask
+ 
+ replace github.com/kurtserdar/StealthWG/wgbind => ../../../../wgbind
++
++replace github.com/kurtserdar/StealthWG/quictransport => ../../../../quictransport
+diff --git a/Sources/WireGuardKitGo/go.sum b/Sources/WireGuardKitGo/go.sum
+index 69a0fb5..6092434 100644
+--- a/Sources/WireGuardKitGo/go.sum
++++ b/Sources/WireGuardKitGo/go.sum
+@@ -1,3 +1,5 @@
++github.com/quic-go/quic-go v0.60.0 h1:xcQioE8OM66UQLeUMHltK1CCcOu3JbVB4JAQdDQSB+0=
++github.com/quic-go/quic-go v0.60.0/go.mod h1:wpKpjmPpftl30sL6pFh7REVpjbcCVy4zt2vDyK1TuJk=
+ golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
+ golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
+ golang.org/x/net v0.56.0 h1:Rw8j/hFzGvJUZwNBXnAtf5sVDVt+65SK2C7IxCxZt5o=
