@@ -94,18 +94,19 @@ transports (UDP mask on 51819 + QUIC on 443).
 | Your situation | Use | What runs | Delivery |
 |---|---|---|---|
 | Fresh Linux host, **no** WireGuard, no Docker | **A. All-in-one native package** | one `stealthwg` binary (embeds WireGuard) | `apt/dnf/apk install` + systemd |
-| Fresh host, **no** WireGuard, but you like **Docker** | **B. Standalone bundle** | relay container **+** a bundled WireGuard container | `docker compose up` |
+| Fresh host, **no** WireGuard, but you like **Docker** | **B. Standalone bundle** | one all-in-one container (userspace WireGuard + masking) | `docker compose up` |
 | You **already** run WireGuard (kernel WG, MikroTik, wg-easy, K8s…) | **C. Relay image** | one relay container in front of your WireGuard | Docker image |
 
 Rules of thumb:
 
-- **No WireGuard yet?** → A (native) or B (Docker). Same result, different taste.
+- **No WireGuard yet?** → A (native) or B (Docker). Same all-in-one engine, different
+  packaging.
 - **Already have WireGuard?** → C only. Don't run A/B — they'd stand up a *second*
   WireGuard you don't need.
-- A is the simplest single-box install; it uses **userspace** WireGuard
-  (`wireguard-go`), so it needs no kernel module. B bundles a kernel-WireGuard
-  container (host needs Linux 5.6+). C carries no WireGuard at all — it just
-  forwards to the WireGuard you already run (kernel, MikroTik, wg-easy… anywhere).
+- A and B both use **userspace** WireGuard (`wireguard-go`) — no kernel module
+  needed. C carries no WireGuard at all; it just forwards to the WireGuard you
+  already run. (For max throughput, B has an opt-in **kernel-WireGuard** variant —
+  see Option B.)
 
 #### In plain words
 
@@ -113,8 +114,8 @@ Rules of thumb:
   single program (`apt install`), run `stealthwg init`, done. WireGuard **and** the
   masking live inside that one program.
 - **B — "Empty server, but I like Docker."** You run `docker compose up` and it
-  brings up **two boxes**: one WireGuard, one masker sitting in front of it. Same
-  result as A, just via Docker.
+  brings up **one all-in-one box** — WireGuard **and** masking in a single container.
+  Same as A, just via Docker.
 - **C — "I already run WireGuard and don't want to touch it."** You install **only
   the masker box** and tell it "my WireGuard is over there." It masks in front of
   it — it does **not** start a second WireGuard (you already have one).
@@ -174,25 +175,32 @@ so the app dials it over QUIC automatically.
 ### Option B — Standalone Docker bundle (fresh host, with Docker)
 
 Same "no existing WireGuard" case as Option A, but for Docker hosts. The
-`deploy/standalone/` compose bundle brings up **two** containers — a bundled
-WireGuard server plus the masking relay in front of it — and prints a client
-profile (with QR).
+`deploy/standalone/` compose bundle runs **one all-in-one container** — the
+`stealthwg` binary with userspace WireGuard + masking + NAT in a single process —
+and prints a client profile (with QR). No host kernel WireGuard needed.
 
 ```sh
 cd deploy/standalone
-cp .env.example .env      # set PUBLIC_HOST (your public IP/DNS)
+cp .env.example .env           # set PUBLIC_HOST (your public IP/DNS)
 docker compose up -d
-docker compose logs wg    # scan the printed QR / copy the profile
+docker compose logs stealthwg  # scan the printed QR / copy the profile
 ```
 
-The gateway container exposes the UDP mask on 51819 and QUIC on 443. The host
-needs kernel WireGuard (Linux 5.6+). Full reference (env vars, RouterOS
-container): **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
+Add more devices later without downtime:
 
-> Choosing between A and B? Both stand up a fresh masked WireGuard. **A** is a
-> single native binary (userspace WG, no Docker, no kernel module). **B** is
-> Docker/compose (two containers, uses the host's kernel WireGuard). Same client
-> profile either way.
+```sh
+docker compose exec stealthwg stealthwg add-client laptop
+```
+
+For **QUIC** on 443, set `TRANSPORT=quic` and `LISTEN=443` in `.env`. The container
+needs `NET_ADMIN` + `/dev/net/tun` (already set in the compose file). Full reference
+(env vars, RouterOS container): **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
+
+> Choosing between A and B? Both stand up the same all-in-one masked WireGuard
+> (userspace `wireguard-go`). **A** is a native binary (no Docker); **B** is one
+> Docker container. Same client profile either way. On a host with kernel WireGuard
+> that wants max throughput, B also has a two-container **kernel-WG variant**
+> (`docker compose -f docker-compose.kernel-wg.yml up -d`).
 
 ### Option C — Relay image (you already run WireGuard)
 
@@ -269,5 +277,5 @@ Run the parser tests with `./scripts/test-parser.sh`; the gateway tests with
 | Fresh Linux host, want one command | **All-in-one** (native package + `stealthwg init`) |
 | Already run WireGuard | **Relay** pointed at your WireGuard |
 | RouterOS / MikroTik / Kubernetes | **Relay** container image |
-| Want Docker + a bundled WireGuard | **Standalone compose bundle** |
-| High throughput / many clients | **Relay + kernel WireGuard** (kernel WG is faster than the all-in-one's userspace engine) |
+| Fresh host, want Docker | **Standalone compose bundle** (one all-in-one container) |
+| High throughput / many clients | Standalone **kernel-WG variant** (`docker-compose.kernel-wg.yml`) — kernel WG is faster than userspace |

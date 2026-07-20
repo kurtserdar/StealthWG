@@ -94,15 +94,16 @@ or B; if yes, pick C.
 | | **A — Native package** | **B — Standalone bundle** | **C — Relay image** |
 |---|---|---|---|
 | **When?** | Empty Linux, **no Docker** | Empty Linux, **you like Docker** | You **already run WireGuard** |
-| **What installs?** | one program (`stealthwg`) | 2 boxes: WireGuard + masker | 1 box: masker only |
-| **WireGuard inside?** | ✅ Yes | ✅ Yes (separate box) | ❌ No (uses yours) |
-| **Engine** | All-in-one | Relay + bundled WG | Relay |
+| **What installs?** | one program (`stealthwg`) | one all-in-one container | 1 box: masker only |
+| **WireGuard inside?** | ✅ Yes | ✅ Yes (same container) | ❌ No (uses yours) |
+| **Engine** | All-in-one | All-in-one | Relay |
 | **How?** | `apt install` + `stealthwg init` | `docker compose up -d` | `docker run … stealthwg-gateway` |
 
 - **A — "Just give me one box with everything inside, no Docker."** Install one
   program, run `stealthwg init`, done. WireGuard **and** the masking live inside it.
-- **B — "Empty server, but I like Docker."** `docker compose up` brings up **two
-  boxes**: one WireGuard, one masker in front of it. Same result as A.
+- **B — "Empty server, but I like Docker."** `docker compose up` brings up **one
+  all-in-one container** (WireGuard + masking, userspace). Same result as A, in
+  Docker. (A kernel-WG variant exists for max throughput.)
 - **C — "I already run WireGuard and don't want to touch it."** Install **only the
   masker box** and point it at your WireGuard. It masks in front — it does **not**
   start a second WireGuard.
@@ -232,16 +233,17 @@ kaldırılması. Derin sunucu referansı: **[docs/deploy-gateway.md](docs/deploy
 | | **A — Native paket** | **B — Standalone bundle** | **C — Relay image** |
 |---|---|---|---|
 | **Ne zaman?** | Boş Linux, **Docker istemiyorsun** | Boş Linux, **Docker seviyorsun** | Zaten **WireGuard'ın var** |
-| **Ne kurulur?** | Tek program (`stealthwg`) | 2 kutu: WireGuard + maskeleyici | 1 kutu: sadece maskeleyici |
-| **İçinde WG var mı?** | ✅ Var | ✅ Var (ayrı kutuda) | ❌ Yok (seninkini kullanır) |
-| **Motor** | All-in-one | Relay + paketli WG | Relay |
+| **Ne kurulur?** | Tek program (`stealthwg`) | Tek all-in-one container | 1 kutu: sadece maskeleyici |
+| **İçinde WG var mı?** | ✅ Var | ✅ Var (aynı container) | ❌ Yok (seninkini kullanır) |
+| **Motor** | All-in-one | All-in-one | Relay |
 | **Nasıl?** | `apt install` + `stealthwg init` | `docker compose up -d` | `docker run … stealthwg-gateway` |
 
 - **A — "Tek kutu ver, her şey içinde olsun, Docker'la uğraşmayayım."** Tek program
   kurarsın, `stealthwg init` dersin, biter. WireGuard **ve** maskeleme o programın
   içinde.
-- **B — "Boş sunucu ama Docker'ı severim."** `docker compose up` dersin; sana **iki
-  kutu** açar: biri WireGuard, biri önündeki maskeleyici. Sonuç A ile aynı.
+- **B — "Boş sunucu ama Docker'ı severim."** `docker compose up` dersin; sana **tek
+  all-in-one container** açar (WireGuard + maskeleme, userspace). Sonuç A ile aynı,
+  Docker'da. (Yüksek performans için kernel-WG variant'ı da var.)
 - **C — "Zaten WireGuard'ım var, ona dokunmayayım."** Sadece **maskeleyici kutuyu**
   kurarsın, "benim WG'm şurada" dersin; önüne geçip maskeler. **Yeni WireGuard
   kurmaz.**
