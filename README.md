@@ -22,7 +22,10 @@ In Turkey, some ISPs and mobile carriers **block or throttle WireGuard** — the
 tunnel won't connect, or slows to a crawl, on **every** port, while ordinary web
 traffic keeps flowing. This is **Deep Packet Inspection (DPI)**: the network
 fingerprints WireGuard on the wire and drops it, so switching ports or endpoints
-doesn't help.
+doesn't help. Turkey is where StealthWG was built and validated, but this isn't a
+Turkey-only problem — DPI-based VPN blocking is used by censoring networks and
+carriers in many countries, and the same masking helps anywhere WireGuard is
+fingerprinted.
 
 The fingerprint is easy to match. Standard WireGuard's handshake packets have a
 fixed shape — a message-type byte followed by reserved zero bytes, plus fixed
@@ -172,7 +175,10 @@ Türkiye'de bazı internet servis sağlayıcıları (ISP) ve GSM operatörleri *
 trafiğini engelliyor ya da kısıtlıyor (throttling)** — tünel **hiçbir portta**
 kurulmuyor ya da sürünüyor; oysa sıradan web trafiği akmaya devam ediyor. Sebep
 **Derin Paket İncelemesi (DPI)**: operatör WireGuard'ı hat üzerindeki parmak izinden
-tanıyıp düşürüyor, bu yüzden port ya da endpoint değiştirmek işe yaramıyor.
+tanıyıp düşürüyor, bu yüzden port ya da endpoint değiştirmek işe yaramıyor. StealthWG
+Türkiye'de geliştirilip doğrulandı, ama bu yalnızca Türkiye'ye özgü bir sorun değil —
+DPI ile VPN engellemesi birçok ülkedeki sansürcü ağlar ve operatörler tarafından
+kullanılıyor; aynı maskeleme, WireGuard'ın parmak izinden tanındığı her yerde işe yarar.
 
 Bu parmak izini eşleştirmek kolaydır. Standart WireGuard'ın el sıkışma paketleri
 sabit bir desene sahiptir — bir mesaj-tipi baytı, ardından ayrılmış sıfır baytlar ve
