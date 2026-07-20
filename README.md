@@ -86,6 +86,31 @@ See **[INSTALL.md](INSTALL.md)** for step-by-step instructions — building the
 iOS/macOS app, and standing up a server (all-in-one native package or relay). Deep
 server reference: **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
 
+### Which install? (plain words)
+
+One question first: **is WireGuard already running on your server?** If no, pick A
+or B; if yes, pick C.
+
+| | **A — Native package** | **B — Standalone bundle** | **C — Relay image** |
+|---|---|---|---|
+| **When?** | Empty Linux, **no Docker** | Empty Linux, **you like Docker** | You **already run WireGuard** |
+| **What installs?** | one program (`stealthwg`) | 2 boxes: WireGuard + masker | 1 box: masker only |
+| **WireGuard inside?** | ✅ Yes | ✅ Yes (separate box) | ❌ No (uses yours) |
+| **Engine** | All-in-one | Relay + bundled WG | Relay |
+| **How?** | `apt install` + `stealthwg init` | `docker compose up -d` | `docker run … stealthwg-gateway` |
+
+- **A — "Just give me one box with everything inside, no Docker."** Install one
+  program, run `stealthwg init`, done. WireGuard **and** the masking live inside it.
+- **B — "Empty server, but I like Docker."** `docker compose up` brings up **two
+  boxes**: one WireGuard, one masker in front of it. Same result as A.
+- **C — "I already run WireGuard and don't want to touch it."** Install **only the
+  masker box** and point it at your WireGuard. It masks in front — it does **not**
+  start a second WireGuard.
+
+**Golden rule:** no WireGuard yet **→ A or B** (same job, one without Docker, one
+with). Already have WireGuard **→ C only** (A/B would stand up a second WireGuard you
+don't need). All three support UDP mask (51819) and QUIC (443).
+
 The app imports a standard wg-quick config with a StealthWG `[Stealth]` section
 (`MaskKey`, and optional fallback `Endpoints`):
 
