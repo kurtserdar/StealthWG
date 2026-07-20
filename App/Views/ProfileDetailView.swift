@@ -55,6 +55,18 @@ struct ProfileDetailView: View {
                           systemImage: s.maskingOn ? "checkmark.shield.fill" : "xmark.shield")
                         .foregroundStyle(s.maskingOn ? Theme.accent : .secondary)
                 }
+                Section("Transport") {
+                    Label(s.transport == "quic" ? "QUIC (HTTPS/443)" : "UDP mask",
+                          systemImage: s.transport == "quic" ? "bolt.horizontal.circle.fill" : "waveform")
+                        .foregroundStyle(Theme.accent)
+                    if s.transport == "quic", let sni = s.sni {
+                        HStack {
+                            Text("SNI").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(sni).font(.system(.footnote, design: .monospaced))
+                        }
+                    }
+                }
                 Section("VPN options") {
                     Toggle("Connect on demand", isOn: Binding(
                         get: { current.onDemand },

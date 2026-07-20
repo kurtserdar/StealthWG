@@ -61,6 +61,18 @@ struct ProfileFormView: View {
                         .buttonStyle(.bordered).font(.caption)
                 }
             }
+            Section("Transport") {
+                Picker("Transport", selection: $draft.transport) {
+                    Text("UDP mask").tag("mask")
+                    Text("QUIC (443)").tag("quic")
+                }
+                .pickerStyle(.segmented)
+                if draft.transport == "quic" {
+                    DraftField("SNI (TLS server name)", text: $draft.sni, placeholder: "e.g. www.cloudflare.com")
+                    Text("QUIC blends with HTTP/3. Point the endpoint at the gateway's QUIC port (usually :443).")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
         }
         .navigationTitle(editing == nil ? "Create profile" : "Edit profile")
         .inlineNavTitle()

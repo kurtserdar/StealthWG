@@ -16,6 +16,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var pollTimer: DispatchSourceTimer?
     private var plan: FallbackPlan?
     private var endpoints: [String] = []
+    private var targets: [EndpointTarget] = []
+    private var activeTransport = "mask"
+    private var sni = ""
     private var currentIndex = 0
     private var endpointStart = Date()
     private var baseConfiguration: TunnelConfiguration?
@@ -41,7 +44,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
         baseConfiguration = tunnelConfiguration
-        endpoints = providerConfiguration["endpoints"] as? [String] ?? []
+
+        // Select the transport (UDP mask vs QUIC) before the device is created.
+        let transport = (providerConfiguration["transport"] as? String) ?? "mask"
+        sni = (providerConfiguration["sni"] as? String) ?? ""
+
+        // Resolve each candidate endpoint's transport (a quic://|mask:// scheme
+        // overrides the profile transport for that endpoint).
+        let rawEndpoints = providerConfiguration["endpoints"] as? [String] ?? []
+        targets = rawEndpoints.map { parseEndpointTarget($0, defaultTransport: transport) }
+        endpoints = targets.map(\.hostPort)
+        activeTransport = targets.first?.transport ?? transport
 
         // Install (or clear) the masking key before the adapter creates the
         // wireguard-go device. An empty string means plain WireGuard.
@@ -50,11 +63,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             completionHandler(PacketTunnelProviderError.invalidMaskKey)
             return
         }
-
-        // Select the transport (UDP mask vs QUIC) before the device is created.
-        let transport = (providerConfiguration["transport"] as? String) ?? "mask"
-        let sni = (providerConfiguration["sni"] as? String) ?? ""
-        _ = wgSetTransport(transport, sni)
+        _ = wgSetTransport(activeTransport, sni)
 
         adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
             if adapterError == nil { self?.startFallbackPolling() }
@@ -128,9 +137,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 case .tryNext(let i):
                     self.currentIndex = i
                     self.endpointStart = Date()
-                    NSLog("[StealthWG] no handshake, trying endpoint %d (%@)", i, self.endpoints[i])
-                    if let cfg = self.configuration(withEndpoint: self.endpoints[i]) {
-                        self.adapter.update(tunnelConfiguration: cfg) { _ in }
+                    let target = self.targets[i]
+                    NSLog("[StealthWG] no handshake, trying endpoint %d (%@ via %@)", i, target.hostPort, target.transport)
+                    if target.transport == self.activeTransport {
+                        // Same transport: an in-place peer-endpoint update (cheap).
+                        if let cfg = self.configuration(withEndpoint: target.hostPort) {
+                            self.adapter.update(tunnelConfiguration: cfg) { _ in }
+                        }
+                    } else {
+                        // Transport changed: the bind is fixed at device creation,
+                        // so restart the engine with the new transport selected.
+                        self.restartEngine(with: target)
                     }
                 case .exhausted:
                     NSLog("[StealthWG] all endpoints exhausted; staying on last")
@@ -146,6 +163,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         guard !peers.isEmpty else { return nil }
         peers[0].endpoint = ep
         return TunnelConfiguration(name: base.name, interface: base.interface, peers: peers)
+    }
+
+    /// Restarts the wireguard-go engine with a new transport selected. The bind
+    /// (mask vs QUIC) is chosen when the device is created, so switching
+    /// transports mid-tunnel requires a stop/start rather than an endpoint update.
+    private func restartEngine(with target: EndpointTarget) {
+        guard let cfg = configuration(withEndpoint: target.hostPort) else { return }
+        activeTransport = target.transport
+        _ = wgSetTransport(target.transport, sni)
+        adapter.stop { [weak self] _ in
+            self?.adapter.start(tunnelConfiguration: cfg) { error in
+                if let error {
+                    NSLog("[StealthWG] transport restart failed: %@", String(describing: error))
+                }
+            }
+        }
     }
 }
 

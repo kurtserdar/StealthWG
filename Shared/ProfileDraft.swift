@@ -16,6 +16,8 @@ struct ProfileDraft {
     var presharedKey = ""
     var fallbackEndpoints: [String] = []
     var maskKey = ""
+    var transport = StealthProfile.defaultTransport
+    var sni = ""
 
     static func defaults() -> ProfileDraft { ProfileDraft() }
 
@@ -58,6 +60,10 @@ struct ProfileDraft {
         lines.append("MaskKey = \(t(maskKey))")
         let eps = ([t(endpoint)] + fallbackEndpoints.map(t)).filter { !$0.isEmpty }
         if eps.count > 1 { lines.append("Endpoints = \(eps.joined(separator: ", "))") }
+        if t(transport) != StealthProfile.defaultTransport && !t(transport).isEmpty {
+            lines.append("Transport = \(t(transport))")
+        }
+        if !t(sni).isEmpty { lines.append("SNI = \(t(sni))") }
         return lines.joined(separator: "\n") + "\n"
     }
 
@@ -86,6 +92,8 @@ struct ProfileDraft {
         d.endpoint = profile.endpoints.first ?? field("Endpoint")
         d.fallbackEndpoints = Array(profile.endpoints.dropFirst())
         d.maskKey = profile.maskKey ?? ""
+        d.transport = profile.transport
+        d.sni = profile.sni ?? ""
         return d
     }
 }

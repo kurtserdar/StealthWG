@@ -11,6 +11,8 @@ struct ProfileSummary: Equatable {
     var peerPublicKey: String?
     var allowedIPs: String?
     var maskingOn: Bool
+    var transport: String
+    var sni: String?
 
     static func from(_ profile: StealthProfile) -> ProfileSummary {
         func field(_ key: String) -> String? {
@@ -31,7 +33,9 @@ struct ProfileSummary: Equatable {
             endpoints: profile.endpoints,
             peerPublicKey: field("PublicKey"),
             allowedIPs: field("AllowedIPs"),
-            maskingOn: profile.maskKey != nil
+            maskingOn: profile.maskKey != nil,
+            transport: profile.transport,
+            sni: profile.sni
         )
     }
 }

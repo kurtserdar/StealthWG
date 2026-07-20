@@ -150,6 +150,25 @@ enum StealthProfileTests {
         check(pureQuic.serialize().contains("[Stealth]"), "quic-only writes [Stealth]")
         check(try! StealthProfile.parse(pureQuic.serialize()) == pureQuic, "quic-only round-trips")
 
+        // parseEndpointTarget: scheme overrides transport; bare inherits default.
+        check(parseEndpointTarget("gw:443", defaultTransport: "quic") == EndpointTarget(hostPort: "gw:443", transport: "quic"), "bare inherits default transport")
+        check(parseEndpointTarget("quic://gw:443", defaultTransport: "mask") == EndpointTarget(hostPort: "gw:443", transport: "quic"), "quic:// scheme overrides")
+        check(parseEndpointTarget("mask://gw:51819", defaultTransport: "quic") == EndpointTarget(hostPort: "gw:51819", transport: "mask"), "mask:// scheme overrides")
+        check(parseEndpointTarget("  QUIC://gw:443 ", defaultTransport: "mask") == EndpointTarget(hostPort: "gw:443", transport: "quic"), "scheme is case-insensitive and trimmed")
+
+        // ProfileDraft carries transport/SNI through build() and from().
+        var qd = ProfileDraft.defaults()
+        qd.privateKey = "+CzRHZBUtXJnt/TL+e2kKcfR5Vsd9qC4Ij+Eg4kaRko="
+        qd.serverPublicKey = "SRV"; qd.endpoint = "gw:443"; qd.maskKey = "MK"
+        qd.transport = "quic"; qd.sni = "www.cloudflare.com"
+        let qbuilt = qd.build()
+        check(qbuilt.contains("Transport = quic"), "draft build writes Transport")
+        check(qbuilt.contains("SNI = www.cloudflare.com"), "draft build writes SNI")
+        let qback = ProfileDraft.from(try! StealthProfile.parse(qbuilt))
+        check(qback.transport == "quic", "draft from: transport")
+        check(qback.sni == "www.cloudflare.com", "draft from: sni")
+        check(ProfileDraft.defaults().build().contains("Transport =") == false, "default draft omits Transport")
+
         // FallbackPlan transitions.
         let plan = FallbackPlan(endpointCount: 2, perEndpointTimeout: 12)
         check(plan.decide(index: 0, elapsed: 3, handshaked: true) == .connected, "handshake -> connected")
@@ -218,9 +237,13 @@ enum StealthProfileTests {
         check(summ.maskingOn == true, "summary masking on")
         check(summ.endpoints == ["gw.example.com:51819", "gw.example.com:443"], "summary endpoints")
         check(summ.peerPublicKey == "bbbb", "summary peer pubkey")
+        check(summ.transport == "mask", "summary default transport mask")
         let summ2 = ProfileSummary.from(single)   // single: full profile with Address/Endpoint
         check(summ2.address == "10.0.0.2/32", "summary address parsed")
         check(summ2.maskingOn == true, "summary2 masking on")
+        let summQ = ProfileSummary.from(pq)   // pq: quic profile with SNI
+        check(summQ.transport == "quic", "summary quic transport")
+        check(summQ.sni == "www.cloudflare.com", "summary quic sni")
 
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
