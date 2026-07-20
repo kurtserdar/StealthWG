@@ -1,15 +1,28 @@
 import SwiftUI
 
-/// Full editor: build a profile from fields, generate/derive keys, save.
+/// Full editor: create a new profile or edit an existing one. Generates/derives
+/// keys, and saves via the tunnel manager.
 struct ProfileFormView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
+    let editing: TunnelProfile?
     let onComplete: () -> Void
 
-    @State private var draft = ProfileDraft.defaults()
+    @State private var draft: ProfileDraft
+    @State private var name: String
     @State private var newFallback = ""
+
+    init(editing: TunnelProfile? = nil, onComplete: @escaping () -> Void) {
+        self.editing = editing
+        self.onComplete = onComplete
+        _draft = State(initialValue: editing.map { ProfileDraft.from($0.profile) } ?? ProfileDraft.defaults())
+        _name = State(initialValue: editing?.name ?? "")
+    }
 
     var body: some View {
         Form {
+            Section("Name") {
+                DraftField("Profile name", text: $name, placeholder: "e.g. Home")
+            }
             Section("Interface") {
                 keyRow
                 DraftField("Addresses", text: $draft.address)
@@ -49,23 +62,30 @@ struct ProfileFormView: View {
                 }
             }
         }
-        .navigationTitle("Create profile")
+        .navigationTitle(editing == nil ? "Create profile" : "Edit profile")
         .inlineNavTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    Task {
-                        await tunnelManager.importProfile(draft.build())
-                        if tunnelManager.hasProfile { onComplete() }
-                    }
-                }.disabled(!canSave)
+                Button("Save") { Task { await save() } }.disabled(!canSave)
             }
         }
     }
 
+    private func save() async {
+        let before = tunnelManager.profiles.count
+        if let editing {
+            await tunnelManager.updateProfile(id: editing.id, name: name, raw: draft.build())
+            onComplete()
+        } else {
+            await tunnelManager.addProfile(draft, name: name)
+            if tunnelManager.profiles.count > before { onComplete() }
+        }
+    }
+
     private var canSave: Bool {
-        [draft.privateKey, draft.serverPublicKey, draft.endpoint, draft.maskKey]
-            .allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+            && [draft.privateKey, draft.serverPublicKey, draft.endpoint, draft.maskKey]
+                .allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 
     private var keyRow: some View {

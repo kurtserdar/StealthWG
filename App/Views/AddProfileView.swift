@@ -1,8 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Chooser for the four ways to add a profile. Every path ends at
-/// TunnelManager.importProfile and then calls onComplete to dismiss.
+/// Chooser for the four ways to add a profile. Imported profiles are named after
+/// their endpoint host; every path ends by adding a profile and calling onComplete.
 struct AddProfileView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
     let onComplete: () -> Void
@@ -40,10 +40,7 @@ struct AddProfileView: View {
             #if os(iOS)
             .sheet(isPresented: $showScanner) {
                 QRScannerView(
-                    onScan: { code in
-                        showScanner = false
-                        Task { await tunnelManager.importProfile(code); if tunnelManager.hasProfile { onComplete() } }
-                    },
+                    onScan: { code in showScanner = false; importText(code) },
                     onError: { m in errorText = m; showScanner = false }
                 ).ignoresSafeArea()
             }
@@ -57,6 +54,11 @@ struct AddProfileView: View {
         #endif
     }
 
+    private func importText(_ text: String) {
+        let name = (try? StealthProfile.parse(text)).map { defaultProfileName(for: $0) } ?? "StealthWG"
+        Task { await tunnelManager.addProfile(name: name, raw: text); onComplete() }
+    }
+
     private func importFromFile(_ url: URL) {
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
@@ -64,7 +66,7 @@ struct AddProfileView: View {
             errorText = "Could not read the file."
             return
         }
-        Task { await tunnelManager.importProfile(text); if tunnelManager.hasProfile { onComplete() } }
+        importText(text)
     }
 
     private func methodRow(_ title: String, _ subtitle: String, _ system: String) -> some View {
@@ -101,7 +103,8 @@ struct PasteImportView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Import") {
-                    Task { await tunnelManager.importProfile(text); if tunnelManager.hasProfile { onComplete() } }
+                    let name = (try? StealthProfile.parse(text)).map { defaultProfileName(for: $0) } ?? "StealthWG"
+                    Task { await tunnelManager.addProfile(name: name, raw: text); onComplete() }
                 }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
