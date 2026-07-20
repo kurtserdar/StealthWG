@@ -76,6 +76,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         _ = wgSetTransport(activeTransport, sni)
 
+        setStopping(false)
         publishWidgetSnapshot(state: .masking)
         adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
             if adapterError == nil {
@@ -94,6 +95,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler: @escaping () -> Void
     ) {
         stopFallbackPolling()
+        setStopping(true)
         stopWidgetStats()
         publishWidgetSnapshot(state: .exposed)
         adapter.stop { _ in
@@ -141,11 +143,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     private var widgetTimer: DispatchSourceTimer?
     private var lastWidgetSample: (rx: Int64, tx: Int64, at: Date)?
+    private let widgetLock = NSLock()
+    private var stopping = false
+
+    private func setStopping(_ v: Bool) { widgetLock.lock(); stopping = v; widgetLock.unlock() }
+    private func isStopping() -> Bool { widgetLock.lock(); defer { widgetLock.unlock() }; return stopping }
 
     /// Writes the current state to the app group and reloads the widgets. This runs
     /// in the extension, so widgets update on connect/disconnect even when the app
     /// is closed (the app also publishes when it is open).
     private func publishWidgetSnapshot(state: WidgetSnapshot.State, rxRate: Double = 0, txRate: Double = 0, lastHandshake: Int = 0) {
+        // Once we start tearing down, don't let an in-flight stats update re-write
+        // .masked over the .exposed we just published (the stop race).
+        if state != .exposed, isStopping() { return }
         let pc = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
         var snap = WidgetStore.load()
         snap.state = state

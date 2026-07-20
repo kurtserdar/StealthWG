@@ -4,6 +4,7 @@ import SwiftUI
 struct StealthWGMacApp: App {
     @StateObject private var tunnelManager = TunnelManager()
     @StateObject private var systemExtension = SystemExtensionManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         MenuBarExtra("StealthWG", systemImage: "shield.lefthalf.filled") {
@@ -11,6 +12,9 @@ struct StealthWGMacApp: App {
                 .environmentObject(tunnelManager)
                 .environmentObject(systemExtension)
                 .task { await tunnelManager.load() }
+                .onChange(of: scenePhase) { phase in
+                    if phase == .active { Task { await tunnelManager.load() } }
+                }
         }
         .menuBarExtraStyle(.window)
 

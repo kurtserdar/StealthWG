@@ -67,6 +67,9 @@ final class TunnelManager: ObservableObject {
             let all = try await NETunnelProviderManager.loadAllFromPreferences()
             rebuild(from: all)
             selectedID = connectedID ?? profiles.first?.id
+            // Re-publish the widget snapshot from the freshly-read status, so opening
+            // (or foregrounding) the app corrects a widget left stale by a toggle.
+            publishWidgetSnapshot()
         } catch {
             lastError = error.localizedDescription
         }

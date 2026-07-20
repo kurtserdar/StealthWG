@@ -1,5 +1,6 @@
 import AppIntents
 import NetworkExtension
+import WidgetKit
 
 /// A StealthWG profile chooseable in Shortcuts / the Quick-connect widget.
 struct ProfileEntity: AppEntity, Identifiable {
@@ -34,6 +35,24 @@ enum VPNIntentError: Error, CustomLocalizedStringResourceConvertible {
     }
 }
 
+/// Optimistically writes the intended state to the app group and reloads the
+/// widgets, so the reload WidgetKit runs right after a widget-button tap shows the
+/// new direction immediately (start/stop is async, so the extension confirms the
+/// final .masked/.exposed a moment later).
+private func publishOptimisticSnapshot(_ state: WidgetSnapshot.State, _ m: NETunnelProviderManager) {
+    let pc = (m.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
+    var snap = WidgetStore.load()
+    snap.state = state
+    snap.profileName = (pc?["profileName"] as? String) ?? snap.profileName
+    snap.transport = (pc?["transport"] as? String) ?? snap.transport ?? "mask"
+    if state == .exposed {
+        snap.rxRate = 0; snap.txRate = 0
+        snap.connectedSince = nil; snap.lastHandshakeSeconds = 0
+    }
+    WidgetStore.save(snap)
+    WidgetCenter.shared.reloadAllTimelines()
+}
+
 /// Loads the target manager: the named profile, else the last-selected one, else the first.
 private func targetManager(_ profile: ProfileEntity?) async throws -> NETunnelProviderManager {
     let managers = try await NETunnelProviderManager.loadAllFromPreferences()
@@ -57,6 +76,7 @@ struct ConnectVPNIntent: AppIntent {
         try await m.saveToPreferences()
         try await m.loadFromPreferences()
         try (m.connection as? NETunnelProviderSession)?.startTunnel()
+        publishOptimisticSnapshot(.masking, m)
         return .result()
     }
 }
@@ -69,6 +89,7 @@ struct DisconnectVPNIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let m = try await targetManager(profile)
         m.connection.stopVPNTunnel()
+        publishOptimisticSnapshot(.exposed, m)
         return .result()
     }
 }
@@ -83,11 +104,13 @@ struct ToggleVPNIntent: AppIntent {
         switch m.connection.status {
         case .connected, .connecting, .reasserting:
             m.connection.stopVPNTunnel()
+            publishOptimisticSnapshot(.exposed, m)
         default:
             m.isEnabled = true
             try await m.saveToPreferences()
             try await m.loadFromPreferences()
             try (m.connection as? NETunnelProviderSession)?.startTunnel()
+            publishOptimisticSnapshot(.masking, m)
         }
         return .result()
     }
@@ -105,8 +128,10 @@ struct SetVPNIntent: SetValueIntent {
             try await m.saveToPreferences()
             try await m.loadFromPreferences()
             try (m.connection as? NETunnelProviderSession)?.startTunnel()
+            publishOptimisticSnapshot(.masking, m)
         } else {
             m.connection.stopVPNTunnel()
+            publishOptimisticSnapshot(.exposed, m)
         }
         return .result()
     }
