@@ -81,3 +81,6 @@ deploy/standalone/.env
 
 # Go build output (compiled gateway binary)
 gateway/stealthwg-gateway
+
+# Package build outputs
+dist/

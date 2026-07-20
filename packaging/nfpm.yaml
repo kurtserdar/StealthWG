@@ -1,0 +1,44 @@
+# nfpm config for the all-in-one StealthWG server. Build via scripts/build-packages.sh,
+# which sets $ARCH and $BINDIR per target. https://nfpm.goreleaser.com
+name: stealthwg
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Serdar Kurt <serdar.kurt@outlook.com>
+description: |
+  StealthWG masked WireGuard server. A single self-contained binary that
+  terminates a masked WireGuard tunnel (embedded wireguard-go + UdpMask), with a
+  `stealthwg init` / `add-client` CLI. Run `sudo stealthwg init` after install.
+homepage: https://github.com/kurtserdar/StealthWG
+license: MIT
+
+# WireGuard itself is embedded (no wireguard-tools needed). These provide the
+# interface/NAT plumbing and optional QR output.
+recommends:
+  - iproute2
+  - iptables
+  - qrencode
+
+contents:
+  - src: dist/stealthwg
+    dst: /usr/bin/stealthwg
+    file_info:
+      mode: 0755
+  - src: packaging/stealthwg.service
+    dst: /lib/systemd/system/stealthwg.service
+  - dst: /etc/stealthwg
+    type: dir
+    file_info:
+      mode: 0700
+
+scripts:
+  postinstall: packaging/postinstall.sh
+
+overrides:
+  apk:
+    recommends:
+      - iproute2
+      - iptables
+      - libqrencode-tools
