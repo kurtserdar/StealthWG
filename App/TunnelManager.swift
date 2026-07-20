@@ -1,5 +1,6 @@
 import Foundation
 import NetworkExtension
+import WidgetKit
 
 /// Live connection statistics shown in the UI, refreshed from the extension.
 struct ConnectionStats: Equatable {
@@ -330,6 +331,36 @@ final class TunnelManager: ObservableObject {
             logLines.removeAll()
             logCursor = 0
         }
+        publishWidgetSnapshot()
+    }
+
+    /// Publishes the current state to the app group so widgets can render it, then
+    /// reloads their timelines. Also records the selected profile for intents.
+    private func publishWidgetSnapshot() {
+        let id = connectedID ?? selectedID
+        WidgetStore.setSelectedProfileID(id)
+        let profile = profiles.first { $0.id == id }
+        let currentStatus = status(of: id)
+
+        let state: WidgetSnapshot.State
+        switch currentStatus {
+        case .connected: state = .masked
+        case .connecting, .reasserting: state = .masking
+        default: state = .exposed
+        }
+
+        let snap = WidgetSnapshot(
+            state: state,
+            profileName: profile?.name,
+            transport: profile?.profile.transport,
+            endpoint: stats?.activeEndpoint ?? profile?.profile.endpoints.first,
+            rxRate: stats?.rxRate ?? 0,
+            txRate: stats?.txRate ?? 0,
+            connectedSince: stats?.connectedSince,
+            lastHandshakeSeconds: stats?.lastHandshakeSeconds ?? 0
+        )
+        WidgetStore.save(snap)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func startStatsPolling(id: String) {
@@ -442,6 +473,7 @@ final class TunnelManager: ObservableObject {
             activeEndpoint: activeEndpoint, isFallback: isFallback,
             connectedSince: connectedSince
         )
+        publishWidgetSnapshot()
     }
 
     private func describe(_ error: Error) -> String {
