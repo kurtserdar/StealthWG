@@ -8,8 +8,17 @@ import WireGuardKit
 /// the WireGuard engine through `WireGuardAdapter`. The masking itself lives in
 /// the wireguard-go bind, so from here on this is a normal WireGuard tunnel.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
-    private lazy var adapter = WireGuardAdapter(with: self) { _, message in
+    private lazy var adapter = WireGuardAdapter(with: self) { [weak self] _, message in
+        self?.log(message)
+    }
+
+    private let logBuffer = LogRingBuffer(capacity: 1000)
+    private var loggingEnabled = true
+
+    /// NSLogs and, when logging is enabled, appends to the ephemeral buffer.
+    private func log(_ message: String) {
         NSLog("[StealthWG] %@", message)
+        if loggingEnabled { logBuffer.append(message) }
     }
 
     private let pollQueue = DispatchQueue(label: "com.stealthwg.fallback")
@@ -48,6 +57,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         // Select the transport (UDP mask vs QUIC) before the device is created.
         let transport = (providerConfiguration["transport"] as? String) ?? "mask"
         sni = (providerConfiguration["sni"] as? String) ?? ""
+        loggingEnabled = (providerConfiguration["loggingEnabled"] as? Bool) ?? true
 
         // Resolve each candidate endpoint's transport (a quic://|mask:// scheme
         // overrides the profile transport for that endpoint).
@@ -84,6 +94,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // MARK: - App messages (live stats for the UI)
 
     override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
+        let command = String(data: messageData, encoding: .utf8) ?? ""
+
+        if command == "logs:clear" {
+            logBuffer.clear()
+            completionHandler?(try? JSONSerialization.data(withJSONObject: [String: Any]()))
+            return
+        }
+        if command.hasPrefix("logs:") {
+            let since = Int(command.dropFirst("logs:".count)) ?? 0
+            let lines = logBuffer.entries(since: since).map { entry -> [String: Any] in
+                ["seq": entry.seq, "ts": entry.date.timeIntervalSince1970, "msg": entry.message]
+            }
+            let payload: [String: Any] = ["lines": lines, "cursor": logBuffer.latestCursor()]
+            completionHandler?(try? JSONSerialization.data(withJSONObject: payload))
+            return
+        }
+
+        // Default: live stats (unchanged).
         adapter.getRuntimeConfiguration { [weak self] runtime in
             let payload: [String: Any] = [
                 "runtime": runtime ?? "",
@@ -130,7 +158,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 let elapsed = Date().timeIntervalSince(self.endpointStart)
                 switch plan.decide(index: self.currentIndex, elapsed: elapsed, handshaked: handshaked) {
                 case .connected:
-                    NSLog("[StealthWG] handshake on endpoint %d (%@)", self.currentIndex, self.endpoints[self.currentIndex])
+                    self.log(String(format: "handshake on endpoint %d (%@)", self.currentIndex, self.endpoints[self.currentIndex]))
                     self.pollTimer?.cancel(); self.pollTimer = nil
                 case .keepWaiting:
                     break
@@ -138,7 +166,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     self.currentIndex = i
                     self.endpointStart = Date()
                     let target = self.targets[i]
-                    NSLog("[StealthWG] no handshake, trying endpoint %d (%@ via %@)", i, target.hostPort, target.transport)
+                    self.log(String(format: "no handshake, trying endpoint %d (%@ via %@)", i, target.hostPort, target.transport))
                     if target.transport == self.activeTransport {
                         // Same transport: an in-place peer-endpoint update (cheap).
                         if let cfg = self.configuration(withEndpoint: target.hostPort) {
@@ -150,7 +178,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                         self.restartEngine(with: target)
                     }
                 case .exhausted:
-                    NSLog("[StealthWG] all endpoints exhausted; staying on last")
+                    self.log("all endpoints exhausted; staying on last")
                     self.pollTimer?.cancel(); self.pollTimer = nil
                 }
             }
@@ -175,7 +203,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         adapter.stop { [weak self] _ in
             self?.adapter.start(tunnelConfiguration: cfg) { error in
                 if let error {
-                    NSLog("[StealthWG] transport restart failed: %@", String(describing: error))
+                    self?.log(String(format: "transport restart failed: %@", String(describing: error)))
                 }
             }
         }
