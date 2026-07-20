@@ -2,26 +2,21 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
-    @State private var showProfileSheet = false
+    @State private var showAddSheet = false
 
     var body: some View {
         ZStack {
             Theme.ink.ignoresSafeArea()
             Group {
-                if tunnelManager.hasProfile {
-                    ConnectionView(showProfile: $showProfileSheet)
-                } else {
+                if tunnelManager.profiles.isEmpty {
                     emptyState
+                } else {
+                    ConnectionView()
                 }
             }
         }
-        .sheet(isPresented: $showProfileSheet) {
-            if tunnelManager.hasProfile {
-                ProfileDetailView().environmentObject(tunnelManager)
-            } else {
-                AddProfileView(onComplete: { showProfileSheet = false })
-                    .environmentObject(tunnelManager)
-            }
+        .sheet(isPresented: $showAddSheet) {
+            AddProfileView(onComplete: { showAddSheet = false }).environmentObject(tunnelManager)
         }
     }
 
@@ -37,7 +32,7 @@ struct ContentView: View {
             Text("Add a profile to start masking your connection.")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button { showProfileSheet = true } label: {
+            Button { showAddSheet = true } label: {
                 Label("Add profile", systemImage: "plus")
                     .frame(maxWidth: .infinity)
             }

@@ -23,27 +23,11 @@ struct StealthWGMacApp: App {
     }
 }
 
-/// Management window: empty state or profile detail, both reusing shared views.
+/// Management window: the profiles list (add / switch / edit / delete).
 private struct ManageWindow: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
-    @State private var showAdd = false
 
     var body: some View {
-        Group {
-            if tunnelManager.hasProfile {
-                ProfileDetailView().environmentObject(tunnelManager)
-            } else {
-                VStack(spacing: 16) {
-                    Image("MacGhost").resizable().scaledToFit().frame(width: 72, height: 72)
-                    Text("Add a profile to get started.").foregroundStyle(.secondary)
-                    Button("Add profile") { showAdd = true }
-                        .buttonStyle(.borderedProminent).tint(Theme.accent)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .sheet(isPresented: $showAdd) {
-            AddProfileView(onComplete: { showAdd = false }).environmentObject(tunnelManager)
-        }
+        ProfilesListView().environmentObject(tunnelManager)
     }
 }

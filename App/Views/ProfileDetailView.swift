@@ -1,77 +1,85 @@
 import SwiftUI
+import NetworkExtension
 
-/// Shows the parsed profile and offers export (QR), replace, and delete.
+/// Shows one profile: connect/disconnect, parsed summary, edit, export (QR), delete.
 struct ProfileDetailView: View {
     @EnvironmentObject private var tunnelManager: TunnelManager
     @Environment(\.dismiss) private var dismiss
-    @State private var showQR = false
-    @State private var showReplace = false
+    let profile: TunnelProfile
 
-    private var summary: ProfileSummary? {
-        guard
-            let text = tunnelManager.currentProfileText(),
-            let profile = try? StealthProfile.parse(text)
-        else { return nil }
-        return ProfileSummary.from(profile)
+    @State private var showQR = false
+    @State private var showEdit = false
+
+    private var summary: ProfileSummary { ProfileSummary.from(profile.profile) }
+    private var status: NEVPNStatus { tunnelManager.status(of: profile.id) }
+    private var isActive: Bool {
+        status == .connected || status == .connecting || status == .reasserting
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if let s = summary {
-                    Section("Interface") {
-                        row("Address", s.address)
-                        row("DNS", s.dns)
-                        row("MTU", s.mtu)
+        List {
+                Section {
+                    Button {
+                        tunnelManager.selectedID = profile.id
+                        isActive ? tunnelManager.disconnect(id: profile.id) : tunnelManager.connect(id: profile.id)
+                    } label: {
+                        Label(isActive ? "Disconnect" : "Connect",
+                              systemImage: isActive ? "stop.circle" : "play.circle")
                     }
-                    Section("Peer") {
-                        row("Public key", s.peerPublicKey)
-                        row("Allowed IPs", s.allowedIPs)
-                    }
-                    Section("Endpoints") {
-                        ForEach(Array(s.endpoints.enumerated()), id: \.offset) { i, ep in
-                            HStack {
-                                Text(ep).font(.system(.footnote, design: .monospaced))
-                                Spacer()
-                                if i == 0 {
-                                    Text("primary").font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
+                    .tint(isActive ? .red : Theme.accent)
+                }
+
+                let s = summary
+                Section("Interface") {
+                    row("Address", s.address)
+                    row("DNS", s.dns)
+                    row("MTU", s.mtu)
+                }
+                Section("Peer") {
+                    row("Public key", s.peerPublicKey)
+                    row("Allowed IPs", s.allowedIPs)
+                }
+                Section("Endpoints") {
+                    ForEach(Array(s.endpoints.enumerated()), id: \.offset) { i, ep in
+                        HStack {
+                            Text(ep).font(.system(.footnote, design: .monospaced))
+                            Spacer()
+                            if i == 0 { Text("primary").font(.caption2).foregroundStyle(.secondary) }
                         }
                     }
-                    Section("Masking") {
-                        Label(s.maskingOn ? "On" : "Off",
-                              systemImage: s.maskingOn ? "checkmark.shield.fill" : "xmark.shield")
-                            .foregroundStyle(s.maskingOn ? Theme.accent : .secondary)
-                    }
+                }
+                Section("Masking") {
+                    Label(s.maskingOn ? "On" : "Off",
+                          systemImage: s.maskingOn ? "checkmark.shield.fill" : "xmark.shield")
+                        .foregroundStyle(s.maskingOn ? Theme.accent : .secondary)
                 }
                 Section {
+                    Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
                     Button { showQR = true } label: { Label("Show QR", systemImage: "qrcode") }
-                    Button { showReplace = true } label: {
-                        Label("Replace profile", systemImage: "arrow.triangle.2.circlepath")
-                    }
                     Button(role: .destructive) {
-                        Task { await tunnelManager.deleteProfile(); dismiss() }
+                        Task { await tunnelManager.deleteProfile(id: profile.id); dismiss() }
                     } label: { Label("Delete profile", systemImage: "trash") }
                 }
             }
-            .navigationTitle("Profile")
+            .navigationTitle(profile.name)
             .inlineNavTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .sheet(isPresented: $showQR) {
-                if let text = tunnelManager.currentProfileText() {
+                if let text = tunnelManager.profileText(id: profile.id) {
                     QRCodeView(text: text)
                 } else {
                     Text("No profile to export.").padding()
                 }
             }
-            .sheet(isPresented: $showReplace) {
-                AddProfileView(onComplete: { showReplace = false })
-                    .environmentObject(tunnelManager)
+            .sheet(isPresented: $showEdit) {
+                NavigationStack {
+                    ProfileFormView(editing: profile, onComplete: { showEdit = false })
+                        .environmentObject(tunnelManager)
+                }
             }
-        }
+            .onAppear { tunnelManager.selectedID = profile.id }
     }
 
     private func row(_ title: String, _ value: String?) -> some View {
