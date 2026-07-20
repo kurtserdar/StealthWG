@@ -116,6 +116,40 @@ enum StealthProfileTests {
         check(peRT.endpoints == pe.endpoints, "endpoints round-trip")
         check(!single.serialize().contains("Endpoints ="), "no Endpoints line for a single endpoint")
 
+        // Transport/SNI: default is mask; quic + SNI parse and round-trip.
+        check(single.transport == "mask", "default transport is mask")
+        check(single.sni == nil, "default sni is nil")
+        check(!single.serialize().contains("Transport"), "no Transport line for the default")
+        let quicRaw = """
+        [Interface]
+        PrivateKey = aaaa
+
+        [Peer]
+        PublicKey = bbbb
+        Endpoint = gw.example.com:443
+        AllowedIPs = 0.0.0.0/0
+
+        [Stealth]
+        MaskKey = kkkk
+        Transport = quic
+        SNI = www.cloudflare.com
+        """
+        let pq = try! StealthProfile.parse(quicRaw)
+        check(pq.transport == "quic", "parses Transport = quic")
+        check(pq.sni == "www.cloudflare.com", "parses SNI")
+        check(pq.serialize().contains("Transport = quic"), "serialize writes Transport")
+        check(pq.serialize().contains("SNI = www.cloudflare.com"), "serialize writes SNI")
+        let pqRT = try! StealthProfile.parse(pq.serialize())
+        check(pqRT == pq, "round-trips quic profile with SNI")
+
+        // A pure-QUIC profile (no mask key) still gets a [Stealth] section.
+        let pureQuic = StealthProfile(
+            wgQuickConfig: "[Interface]\nPrivateKey = aaaa",
+            maskKey: nil, transport: "quic", sni: "example.org"
+        )
+        check(pureQuic.serialize().contains("[Stealth]"), "quic-only writes [Stealth]")
+        check(try! StealthProfile.parse(pureQuic.serialize()) == pureQuic, "quic-only round-trips")
+
         // FallbackPlan transitions.
         let plan = FallbackPlan(endpointCount: 2, perEndpointTimeout: 12)
         check(plan.decide(index: 0, elapsed: 3, handshaked: true) == .connected, "handshake -> connected")

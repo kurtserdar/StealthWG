@@ -88,7 +88,11 @@ final class TunnelManager: ObservableObject {
         let cfg = proto.providerConfiguration?["wgQuickConfig"] as? String ?? ""
         let mask = proto.providerConfiguration?["maskKey"] as? String
         let eps = proto.providerConfiguration?["endpoints"] as? [String] ?? []
-        return StealthProfile(wgQuickConfig: cfg, maskKey: mask, endpoints: eps).serialize()
+        let transport = proto.providerConfiguration?["transport"] as? String ?? StealthProfile.defaultTransport
+        let sni = proto.providerConfiguration?["sni"] as? String
+        return StealthProfile(
+            wgQuickConfig: cfg, maskKey: mask, endpoints: eps, transport: transport, sni: sni
+        ).serialize()
     }
 
     private func observe(id: String, connection: NEVPNConnection) {
@@ -140,6 +144,8 @@ final class TunnelManager: ObservableObject {
         var pc: [String: Any] = ["wgQuickConfig": profile.wgQuickConfig, "profileID": id]
         if let mask = profile.maskKey { pc["maskKey"] = mask }
         if !profile.endpoints.isEmpty { pc["endpoints"] = profile.endpoints }
+        if profile.transport != StealthProfile.defaultTransport { pc["transport"] = profile.transport }
+        if let sni = profile.sni { pc["sni"] = sni }
         proto.providerConfiguration = pc
         proto.includeAllNetworks = existing?.includeAllNetworks ?? false
         proto.excludeLocalNetworks = existing?.excludeLocalNetworks ?? false

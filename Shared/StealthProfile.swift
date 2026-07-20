@@ -14,11 +14,26 @@ struct StealthProfile: Equatable {
     let maskKey: String?
     /// Ordered gateway endpoints to try (primary first). May be empty.
     let endpoints: [String]
+    /// Transport from `[Stealth] Transport`: `"mask"` (UDP mask, default) or `"quic"`.
+    let transport: String
+    /// TLS SNI presented by the QUIC transport, from `[Stealth] SNI`, or nil.
+    let sni: String?
 
-    init(wgQuickConfig: String, maskKey: String?, endpoints: [String] = []) {
+    /// The default transport when a profile omits `[Stealth] Transport`.
+    static let defaultTransport = "mask"
+
+    init(
+        wgQuickConfig: String,
+        maskKey: String?,
+        endpoints: [String] = [],
+        transport: String = StealthProfile.defaultTransport,
+        sni: String? = nil
+    ) {
         self.wgQuickConfig = wgQuickConfig
         self.maskKey = maskKey
         self.endpoints = endpoints
+        self.transport = transport
+        self.sni = sni
     }
 
     enum ParseError: Error, Equatable {
@@ -31,6 +46,8 @@ struct StealthProfile: Equatable {
         var maskKey: String?
         var peerEndpoint: String?
         var stealthEndpoints: [String] = []
+        var transport = StealthProfile.defaultTransport
+        var sni: String?
         var inStealthSection = false
 
         for rawLine in raw.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -55,6 +72,12 @@ struct StealthProfile: Equatable {
                         .map { $0.trimmingCharacters(in: .whitespaces) }
                         .filter { !$0.isEmpty }
                 }
+                if let value = value(of: "Transport", in: trimmed) {
+                    transport = value.lowercased()
+                }
+                if let value = value(of: "SNI", in: trimmed) {
+                    sni = value
+                }
                 continue
             }
 
@@ -75,7 +98,13 @@ struct StealthProfile: Equatable {
         for ep in ([peerEndpoint].compactMap { $0 } + stealthEndpoints) where !ordered.contains(ep) {
             ordered.append(ep)
         }
-        return StealthProfile(wgQuickConfig: wgConfig, maskKey: maskKey, endpoints: ordered)
+        return StealthProfile(
+            wgQuickConfig: wgConfig,
+            maskKey: maskKey,
+            endpoints: ordered,
+            transport: transport,
+            sni: sni
+        )
     }
 
     /// Reconstructs the raw StealthWG profile text: the wg-quick config, plus a
@@ -83,13 +112,23 @@ struct StealthProfile: Equatable {
     /// `parse`, so `parse(serialize(x)) == x`.
     func serialize() -> String {
         var out = wgQuickConfig
+        var stealth = ""
         if let maskKey {
-            out += "\n\n[Stealth]\nMaskKey = \(maskKey)\n"
-            if endpoints.count > 1 {
-                out += "Endpoints = \(endpoints.joined(separator: ", "))\n"
-            }
-        } else {
+            stealth += "MaskKey = \(maskKey)\n"
+        }
+        if endpoints.count > 1 {
+            stealth += "Endpoints = \(endpoints.joined(separator: ", "))\n"
+        }
+        if transport != StealthProfile.defaultTransport {
+            stealth += "Transport = \(transport)\n"
+        }
+        if let sni {
+            stealth += "SNI = \(sni)\n"
+        }
+        if stealth.isEmpty {
             out += "\n"
+        } else {
+            out += "\n\n[Stealth]\n" + stealth
         }
         return out
     }
