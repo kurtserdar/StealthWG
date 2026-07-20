@@ -107,6 +107,22 @@ Rules of thumb:
   container (host needs Linux 5.6+). C carries no WireGuard at all — it just
   forwards to the WireGuard you already run (kernel, MikroTik, wg-easy… anywhere).
 
+#### In plain words
+
+- **A — "Just give me one box with everything inside, no Docker."** You install a
+  single program (`apt install`), run `stealthwg init`, done. WireGuard **and** the
+  masking live inside that one program.
+- **B — "Empty server, but I like Docker."** You run `docker compose up` and it
+  brings up **two boxes**: one WireGuard, one masker sitting in front of it. Same
+  result as A, just via Docker.
+- **C — "I already run WireGuard and don't want to touch it."** You install **only
+  the masker box** and tell it "my WireGuard is over there." It masks in front of
+  it — it does **not** start a second WireGuard (you already have one).
+
+Golden rule: **no WireGuard yet → A or B** (same job, one without Docker, one with).
+**Already have WireGuard → C only** (A/B would stand up a second WireGuard you don't
+need).
+
 ---
 
 ### Option A — All-in-one native package (fresh host, no Docker)
