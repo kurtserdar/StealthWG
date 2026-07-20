@@ -95,6 +95,11 @@ struct ProfileDetailView: View {
                     } label: {
                         Label("Connection log", systemImage: "text.alignleft")
                     }
+                    NavigationLink {
+                        DiagnosticsView(profile: profile.profile)
+                    } label: {
+                        Label("Test reachability", systemImage: "bolt.horizontal.circle")
+                    }
                 }
                 Section {
                     Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
