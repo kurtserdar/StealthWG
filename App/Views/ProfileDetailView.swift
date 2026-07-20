@@ -10,7 +10,9 @@ struct ProfileDetailView: View {
     @State private var showQR = false
     @State private var showEdit = false
 
-    private var summary: ProfileSummary { ProfileSummary.from(profile.profile) }
+    /// Live profile from the manager so the VPN-option toggles reflect saved state.
+    private var current: TunnelProfile { tunnelManager.profiles.first { $0.id == profile.id } ?? profile }
+    private var summary: ProfileSummary { ProfileSummary.from(current.profile) }
     private var status: NEVPNStatus { tunnelManager.status(of: profile.id) }
     private var isActive: Bool {
         status == .connected || status == .connecting || status == .reasserting
@@ -53,6 +55,28 @@ struct ProfileDetailView: View {
                           systemImage: s.maskingOn ? "checkmark.shield.fill" : "xmark.shield")
                         .foregroundStyle(s.maskingOn ? Theme.accent : .secondary)
                 }
+                Section("VPN options") {
+                    Toggle("Connect on demand", isOn: Binding(
+                        get: { current.onDemand },
+                        set: { v in Task { await tunnelManager.setOnDemand(id: profile.id, enabled: v) } }))
+                    Text("Automatically connect and stay on; block traffic if the VPN drops.")
+                        .font(.caption2).foregroundStyle(.secondary)
+
+                    Toggle("Kill switch (route all traffic)", isOn: Binding(
+                        get: { current.killSwitch },
+                        set: { v in Task { await tunnelManager.setKillSwitch(id: profile.id, enabled: v) } }))
+                    Text("Send all traffic through the tunnel to prevent leaks.")
+                        .font(.caption2).foregroundStyle(.secondary)
+
+                    if current.killSwitch {
+                        Toggle("Allow local network", isOn: Binding(
+                            get: { current.allowLocal },
+                            set: { v in Task { await tunnelManager.setAllowLocal(id: profile.id, enabled: v) } }))
+                        Text("Keep printers, file shares, and other LAN devices reachable.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                .tint(Theme.accent)
                 Section {
                     Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
                     Button { showQR = true } label: { Label("Show QR", systemImage: "qrcode") }
@@ -61,7 +85,7 @@ struct ProfileDetailView: View {
                     } label: { Label("Delete profile", systemImage: "trash") }
                 }
             }
-            .navigationTitle(profile.name)
+            .navigationTitle(current.name)
             .inlineNavTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
