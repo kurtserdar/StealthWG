@@ -299,6 +299,26 @@ enum StealthProfileTests {
         check(DiagnosticStatus.needsTunnel.symbol == "info.circle", "needsTunnel symbol")
         check(diagnosticsSummary(live).contains("MASK  gw.example.com:51819  —  Reachable (live tunnel)"), "summary line format")
 
+        // On-demand rule specs: trusted Wi-Fi Ignore + optional cellular + Connect.
+        check(onDemandRuleSpecs(trustedSSIDs: [], trustCellular: false)
+              == [OnDemandRuleSpec(action: .connect, interface: .any, ssids: [])],
+              "empty -> connect everywhere")
+        check(onDemandRuleSpecs(trustedSSIDs: ["Home"], trustCellular: false)
+              == [OnDemandRuleSpec(action: .ignore, interface: .wifi, ssids: ["Home"]),
+                  OnDemandRuleSpec(action: .connect, interface: .any, ssids: [])],
+              "ssids -> ignore wifi then connect")
+        check(onDemandRuleSpecs(trustedSSIDs: ["Home", "Work"], trustCellular: true)
+              == [OnDemandRuleSpec(action: .ignore, interface: .wifi, ssids: ["Home", "Work"]),
+                  OnDemandRuleSpec(action: .ignore, interface: .cellular, ssids: []),
+                  OnDemandRuleSpec(action: .connect, interface: .any, ssids: [])],
+              "ssids + cellular -> three rules in order")
+        check(onDemandRuleSpecs(trustedSSIDs: [], trustCellular: true)
+              == [OnDemandRuleSpec(action: .ignore, interface: .cellular, ssids: []),
+                  OnDemandRuleSpec(action: .connect, interface: .any, ssids: [])],
+              "cellular only -> ignore cellular then connect")
+        check(onDemandRuleSpecs(trustedSSIDs: [" Home ", "", "Home"], trustCellular: false)[0].ssids == ["Home"],
+              "blank dropped and ssids de-duplicated/trimmed")
+
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)
     }
