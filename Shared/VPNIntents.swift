@@ -53,6 +53,21 @@ private func publishOptimisticSnapshot(_ state: WidgetSnapshot.State, _ m: NETun
     WidgetCenter.shared.reloadAllTimelines()
 }
 
+/// Waits (briefly) until the connection settles into a terminal state, so the
+/// intent can write the FINAL widget state before it returns — WidgetKit reliably
+/// reloads a widget after its button-intent finishes, but not from the extension.
+private func waitForSettled(_ m: NETunnelProviderManager, timeout: TimeInterval = 8) async {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        switch m.connection.status {
+        case .connected, .disconnected, .invalid:
+            return
+        default:
+            try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 s
+        }
+    }
+}
+
 /// Loads the target manager: the named profile, else the last-selected one, else the first.
 private func targetManager(_ profile: ProfileEntity?) async throws -> NETunnelProviderManager {
     let managers = try await NETunnelProviderManager.loadAllFromPreferences()
@@ -77,6 +92,8 @@ struct ConnectVPNIntent: AppIntent {
         try await m.loadFromPreferences()
         try (m.connection as? NETunnelProviderSession)?.startTunnel()
         publishOptimisticSnapshot(.masking, m)
+        await waitForSettled(m)
+        publishOptimisticSnapshot(m.connection.status == .connected ? .masked : .exposed, m)
         return .result()
     }
 }
@@ -111,6 +128,8 @@ struct ToggleVPNIntent: AppIntent {
             try await m.loadFromPreferences()
             try (m.connection as? NETunnelProviderSession)?.startTunnel()
             publishOptimisticSnapshot(.masking, m)
+            await waitForSettled(m)
+            publishOptimisticSnapshot(m.connection.status == .connected ? .masked : .exposed, m)
         }
         return .result()
     }
@@ -129,6 +148,8 @@ struct SetVPNIntent: SetValueIntent {
             try await m.loadFromPreferences()
             try (m.connection as? NETunnelProviderSession)?.startTunnel()
             publishOptimisticSnapshot(.masking, m)
+            await waitForSettled(m)
+            publishOptimisticSnapshot(m.connection.status == .connected ? .masked : .exposed, m)
         } else {
             m.connection.stopVPNTunnel()
             publishOptimisticSnapshot(.exposed, m)
