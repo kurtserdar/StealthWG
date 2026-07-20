@@ -157,6 +157,7 @@ final class TunnelManager: ObservableObject {
         proto.providerBundleIdentifier = TunnelConstants.tunnelBundleIdentifier
         proto.serverAddress = TunnelConstants.displayName
         var pc: [String: Any] = ["wgQuickConfig": profile.wgQuickConfig, "profileID": id]
+        pc["profileName"] = name.isEmpty ? TunnelConstants.displayName : name
         if let mask = profile.maskKey { pc["maskKey"] = mask }
         if !profile.endpoints.isEmpty { pc["endpoints"] = profile.endpoints }
         if profile.transport != StealthProfile.defaultTransport { pc["transport"] = profile.transport }

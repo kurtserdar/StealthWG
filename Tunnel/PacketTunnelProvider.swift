@@ -1,5 +1,6 @@
 import NetworkExtension
 import WireGuardKit
+import WidgetKit
 
 /// Packet tunnel provider for StealthWG.
 ///
@@ -75,8 +76,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         _ = wgSetTransport(activeTransport, sni)
 
+        publishWidgetSnapshot(state: .masking)
         adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
-            if adapterError == nil { self?.startFallbackPolling() }
+            if adapterError == nil {
+                self?.startFallbackPolling()
+                self?.publishWidgetSnapshot(state: .masked)
+                self?.startWidgetStats()
+            } else {
+                self?.publishWidgetSnapshot(state: .exposed)
+            }
             completionHandler(adapterError)
         }
     }
@@ -86,6 +94,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler: @escaping () -> Void
     ) {
         stopFallbackPolling()
+        stopWidgetStats()
+        publishWidgetSnapshot(state: .exposed)
         adapter.stop { _ in
             completionHandler()
         }
@@ -125,6 +135,73 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func currentActiveEndpoint() -> String? {
         guard !endpoints.isEmpty, currentIndex < endpoints.count else { return nil }
         return endpoints[currentIndex]
+    }
+
+    // MARK: - Widget snapshot (keeps widgets fresh without the app)
+
+    private var widgetTimer: DispatchSourceTimer?
+    private var lastWidgetSample: (rx: Int64, tx: Int64, at: Date)?
+
+    /// Writes the current state to the app group and reloads the widgets. This runs
+    /// in the extension, so widgets update on connect/disconnect even when the app
+    /// is closed (the app also publishes when it is open).
+    private func publishWidgetSnapshot(state: WidgetSnapshot.State, rxRate: Double = 0, txRate: Double = 0, lastHandshake: Int = 0) {
+        let pc = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
+        var snap = WidgetStore.load()
+        snap.state = state
+        snap.profileName = (pc?["profileName"] as? String) ?? snap.profileName
+        snap.transport = (pc?["transport"] as? String) ?? "mask"
+        snap.endpoint = currentActiveEndpoint() ?? snap.endpoint
+        switch state {
+        case .masked:
+            snap.rxRate = rxRate
+            snap.txRate = txRate
+            snap.lastHandshakeSeconds = lastHandshake
+            if snap.connectedSince == nil { snap.connectedSince = Date() }
+        case .exposed:
+            snap.rxRate = 0; snap.txRate = 0
+            snap.connectedSince = nil; snap.lastHandshakeSeconds = 0
+        case .masking:
+            break
+        }
+        WidgetStore.save(snap)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// While connected, refresh the widgets' throughput periodically. Home-screen
+    /// widgets are not real-time (iOS throttles refreshes), so this is a best-effort
+    /// cadence, not per-second.
+    private func startWidgetStats() {
+        stopWidgetStats()
+        let timer = DispatchSource.makeTimerSource(queue: pollQueue)
+        timer.schedule(deadline: .now() + 5, repeating: 15)
+        timer.setEventHandler { [weak self] in self?.updateWidgetStats() }
+        widgetTimer = timer
+        timer.resume()
+    }
+
+    private func stopWidgetStats() {
+        widgetTimer?.cancel()
+        widgetTimer = nil
+        lastWidgetSample = nil
+    }
+
+    private func updateWidgetStats() {
+        adapter.getRuntimeConfiguration { [weak self] runtime in
+            guard let self, let runtime else { return }
+            let s = parseRuntimeStats(runtime)
+            var rx = 0.0, tx = 0.0
+            let now = Date()
+            if let last = self.lastWidgetSample {
+                let dt = now.timeIntervalSince(last.at)
+                if dt > 0 {
+                    rx = max(0, Double(s.rxBytes - last.rx) / dt)
+                    tx = max(0, Double(s.txBytes - last.tx) / dt)
+                }
+            }
+            self.lastWidgetSample = (s.rxBytes, s.txBytes, now)
+            self.publishWidgetSnapshot(state: .masked, rxRate: rx, txRate: tx, lastHandshake: s.lastHandshakeSeconds)
+        }
     }
 
     // MARK: - Endpoint fallback
