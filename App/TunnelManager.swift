@@ -13,152 +13,193 @@ struct ConnectionStats: Equatable {
     var connectedSince: Date?
 }
 
-/// Observable wrapper around `NETunnelProviderManager` that the UI binds to.
-///
-/// The app parses a pasted StealthWG profile, stores the wg-quick config and the
-/// mask key in the tunnel's provider configuration, and starts/stops the tunnel.
-/// The packet tunnel extension reads that configuration and drives WireGuard.
+/// A saved StealthWG profile — one NETunnelProviderManager.
+struct TunnelProfile: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let profile: StealthProfile
+}
+
+/// Observable multi-profile wrapper the UI binds to. Each profile is a separate
+/// NETunnelProviderManager; only one tunnel can be active at a time.
 @MainActor
 final class TunnelManager: ObservableObject {
-    @Published private(set) var status: NEVPNStatus = .invalid
-    @Published private(set) var lastError: String?
-    @Published private(set) var hasProfile = false
+    @Published private(set) var profiles: [TunnelProfile] = []
+    @Published private(set) var statuses: [String: NEVPNStatus] = [:]
     @Published private(set) var stats: ConnectionStats?
+    @Published private(set) var lastError: String?
+    @Published var selectedID: String?
 
-    private var manager: NETunnelProviderManager?
-    private var statusObserver: NSObjectProtocol?
+    private var managers: [String: NETunnelProviderManager] = [:]
+    private var observers: [NSObjectProtocol] = []
     private var statsTimer: Timer?
     private var lastSample: (rx: Int64, tx: Int64, at: Date)?
     private var connectedSince: Date?
 
-    /// Load the existing tunnel configuration from preferences, if any.
+    var selectedProfile: TunnelProfile? { profiles.first { $0.id == selectedID } }
+    var connectedID: String? { profiles.first { isActive(statuses[$0.id] ?? .invalid) }?.id }
+    func status(of id: String?) -> NEVPNStatus { id.flatMap { statuses[$0] } ?? .invalid }
+
+    private func isActive(_ s: NEVPNStatus) -> Bool {
+        s == .connected || s == .connecting || s == .reasserting
+    }
+
+    // MARK: - Load
+
     func load() async {
         do {
-            let managers = try await NETunnelProviderManager.loadAllFromPreferences()
-            let manager = managers.first ?? NETunnelProviderManager()
-            self.manager = manager
-            hasProfile = profileIsPresent(in: manager)
-            observeStatus(of: manager)
-            status = manager.connection.status
+            let all = try await NETunnelProviderManager.loadAllFromPreferences()
+            rebuild(from: all)
+            selectedID = connectedID ?? profiles.first?.id
         } catch {
             lastError = error.localizedDescription
         }
     }
 
-    /// Parse a pasted StealthWG profile and save it as the tunnel configuration.
-    func importProfile(_ raw: String) async {
+    private func rebuild(from all: [NETunnelProviderManager]) {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers.removeAll()
+        managers.removeAll()
+        var list: [TunnelProfile] = []
+        for m in all {
+            guard
+                let proto = m.protocolConfiguration as? NETunnelProviderProtocol,
+                proto.providerConfiguration?["wgQuickConfig"] is String,
+                let parsed = try? StealthProfile.parse(assemble(proto))
+            else { continue }
+            let id = (proto.providerConfiguration?["profileID"] as? String) ?? UUID().uuidString
+            managers[id] = m
+            statuses[id] = m.connection.status
+            list.append(TunnelProfile(id: id, name: m.localizedDescription ?? "StealthWG", profile: parsed))
+            observe(id: id, connection: m.connection)
+        }
+        profiles = list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func assemble(_ proto: NETunnelProviderProtocol) -> String {
+        let cfg = proto.providerConfiguration?["wgQuickConfig"] as? String ?? ""
+        let mask = proto.providerConfiguration?["maskKey"] as? String
+        let eps = proto.providerConfiguration?["endpoints"] as? [String] ?? []
+        return StealthProfile(wgQuickConfig: cfg, maskKey: mask, endpoints: eps).serialize()
+    }
+
+    private func observe(id: String, connection: NEVPNConnection) {
+        let o = NotificationCenter.default.addObserver(
+            forName: .NEVPNStatusDidChange, object: connection, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.statuses[id] = connection.status
+            self.handleStatusChange(id: id, status: connection.status)
+        }
+        observers.append(o)
+    }
+
+    // MARK: - CRUD
+
+    func addProfile(_ draft: ProfileDraft, name: String) async {
+        await addProfile(name: name, raw: draft.build())
+    }
+
+    func addProfile(name: String, raw: String) async {
         do {
             let profile = try StealthProfile.parse(raw)
-
-            let proto = NETunnelProviderProtocol()
-            proto.providerBundleIdentifier = TunnelConstants.tunnelBundleIdentifier
-            proto.serverAddress = TunnelConstants.displayName
-            var providerConfiguration: [String: Any] = ["wgQuickConfig": profile.wgQuickConfig]
-            if let maskKey = profile.maskKey {
-                providerConfiguration["maskKey"] = maskKey
-            }
-            if !profile.endpoints.isEmpty {
-                providerConfiguration["endpoints"] = profile.endpoints
-            }
-            proto.providerConfiguration = providerConfiguration
-
-            let manager = self.manager ?? NETunnelProviderManager()
-            manager.protocolConfiguration = proto
-            manager.localizedDescription = TunnelConstants.displayName
-            manager.isEnabled = true
-
-            try await manager.saveToPreferences()
-            // Reload so the connection object reflects the saved configuration.
-            try await manager.loadFromPreferences()
-
-            self.manager = manager
-            observeStatus(of: manager)
-            hasProfile = true
-            lastError = nil
+            let resolvedName = name.isEmpty ? defaultProfileName(for: profile) : name
+            let m = NETunnelProviderManager()
+            try await save(profile: profile, name: resolvedName, into: m, id: UUID().uuidString)
+            await reloadAndSelect(preferName: resolvedName)
         } catch {
             lastError = describe(error)
         }
     }
 
-    /// Reconstructs the saved profile's raw text (wg-quick + `[Stealth]`) for
-    /// export, or nil when no profile is configured.
-    func currentProfileText() -> String? {
-        guard
-            let proto = manager?.protocolConfiguration as? NETunnelProviderProtocol,
-            let config = proto.providerConfiguration?["wgQuickConfig"] as? String
-        else {
-            return nil
+    func updateProfile(id: String, name: String, raw: String) async {
+        guard let m = managers[id] else { return }
+        do {
+            let profile = try StealthProfile.parse(raw)
+            try await save(profile: profile, name: name, into: m, id: id)
+            await reloadAndSelect(preferID: id)
+        } catch {
+            lastError = describe(error)
         }
-        let maskKey = proto.providerConfiguration?["maskKey"] as? String
-        let endpoints = proto.providerConfiguration?["endpoints"] as? [String] ?? []
-        return StealthProfile(wgQuickConfig: config, maskKey: maskKey, endpoints: endpoints).serialize()
     }
 
-    /// Start the tunnel using the saved profile.
-    func connect() {
+    private func save(profile: StealthProfile, name: String, into m: NETunnelProviderManager, id: String) async throws {
+        let proto = NETunnelProviderProtocol()
+        proto.providerBundleIdentifier = TunnelConstants.tunnelBundleIdentifier
+        proto.serverAddress = TunnelConstants.displayName
+        var pc: [String: Any] = ["wgQuickConfig": profile.wgQuickConfig, "profileID": id]
+        if let mask = profile.maskKey { pc["maskKey"] = mask }
+        if !profile.endpoints.isEmpty { pc["endpoints"] = profile.endpoints }
+        proto.providerConfiguration = pc
+        m.protocolConfiguration = proto
+        m.localizedDescription = name.isEmpty ? TunnelConstants.displayName : name
+        m.isEnabled = true
+        try await m.saveToPreferences()
+        try await m.loadFromPreferences()
+        lastError = nil
+    }
+
+    private func reloadAndSelect(preferID: String? = nil, preferName: String? = nil) async {
+        if let all = try? await NETunnelProviderManager.loadAllFromPreferences() {
+            rebuild(from: all)
+        }
+        if let preferID, profiles.contains(where: { $0.id == preferID }) {
+            selectedID = preferID
+        } else if let preferName, let match = profiles.first(where: { $0.name == preferName }) {
+            selectedID = match.id
+        } else if selectedProfile == nil {
+            selectedID = connectedID ?? profiles.first?.id
+        }
+    }
+
+    func deleteProfile(id: String) async {
+        guard let m = managers[id] else { return }
+        if connectedID == id { stopStatsPolling() }
+        do { try await m.removeFromPreferences() } catch { lastError = error.localizedDescription }
+        await reloadAndSelect()
+    }
+
+    // MARK: - Connect
+
+    func connect(id: String) {
+        if let other = connectedID, other != id { managers[other]?.connection.stopVPNTunnel() }
         do {
-            try manager?.connection.startVPNTunnel()
+            try managers[id]?.connection.startVPNTunnel()
             lastError = nil
         } catch {
             lastError = error.localizedDescription
         }
     }
 
-    /// Stop the active tunnel connection.
-    func disconnect() {
-        manager?.connection.stopVPNTunnel()
+    func disconnect(id: String) {
+        managers[id]?.connection.stopVPNTunnel()
     }
 
-    private func profileIsPresent(in manager: NETunnelProviderManager) -> Bool {
-        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
-        return proto?.providerConfiguration?["wgQuickConfig"] != nil
+    func profileText(id: String) -> String? {
+        guard let m = managers[id], let proto = m.protocolConfiguration as? NETunnelProviderProtocol else { return nil }
+        return assemble(proto)
     }
 
-    private func describe(_ error: Error) -> String {
-        if case StealthProfile.ParseError.emptyConfiguration = error {
-            return "The profile is empty or missing an [Interface] section."
-        }
-        return error.localizedDescription
-    }
+    // MARK: - Stats (for the connected tunnel)
 
-    private func observeStatus(of manager: NETunnelProviderManager) {
-        if let statusObserver {
-            NotificationCenter.default.removeObserver(statusObserver)
-        }
-        status = manager.connection.status
-        statusObserver = NotificationCenter.default.addObserver(
-            forName: .NEVPNStatusDidChange,
-            object: manager.connection,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            self.status = manager.connection.status
-            self.handleStatusChange(self.status)
-        }
-    }
-
-    // MARK: - Live stats
-
-    private func handleStatusChange(_ status: NEVPNStatus) {
+    private func handleStatusChange(id: String, status: NEVPNStatus) {
         if status == .connected {
             if connectedSince == nil { connectedSince = Date() }
-            startStatsPolling()
-        } else {
+            startStatsPolling(id: id)
+        } else if !isActive(status), connectedID == nil {
             stopStatsPolling()
-            if status != .reasserting {
-                connectedSince = nil
-                lastSample = nil
-                stats = nil
-            }
+            connectedSince = nil
+            lastSample = nil
+            stats = nil
         }
     }
 
-    private func startStatsPolling() {
+    private func startStatsPolling(id: String) {
         guard statsTimer == nil else { return }
         statsTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            self?.pollStats()
+            self?.pollStats(id: id)
         }
-        pollStats()
+        pollStats(id: id)
     }
 
     private func stopStatsPolling() {
@@ -166,24 +207,21 @@ final class TunnelManager: ObservableObject {
         statsTimer = nil
     }
 
-    private func pollStats() {
-        guard let session = manager?.connection as? NETunnelProviderSession else { return }
+    private func pollStats(id: String) {
+        guard let session = managers[id]?.connection as? NETunnelProviderSession else { return }
         do {
             try session.sendProviderMessage(Data("stats".utf8)) { [weak self] response in
                 guard
                     let response,
                     let obj = try? JSONSerialization.jsonObject(with: response) as? [String: Any]
                 else { return }
-                let runtime = obj["runtime"] as? String ?? ""
-                let parsed = parseRuntimeStats(runtime)
-                let activeEndpoint = obj["activeEndpoint"] as? String
-                let isFallback = obj["isFallback"] as? Bool ?? false
-                Task { @MainActor in
-                    self?.updateStats(parsed, activeEndpoint: activeEndpoint, isFallback: isFallback)
-                }
+                let parsed = parseRuntimeStats(obj["runtime"] as? String ?? "")
+                let ep = obj["activeEndpoint"] as? String
+                let fb = obj["isFallback"] as? Bool ?? false
+                Task { @MainActor in self?.updateStats(parsed, activeEndpoint: ep, isFallback: fb) }
             }
         } catch {
-            // Transient (tunnel not ready yet); ignore and retry next tick.
+            // Transient; retry next tick.
         }
     }
 
@@ -208,19 +246,10 @@ final class TunnelManager: ObservableObject {
         )
     }
 
-    /// Remove the saved tunnel configuration.
-    func deleteProfile() async {
-        stopStatsPolling()
-        do {
-            try await manager?.removeFromPreferences()
-        } catch {
-            lastError = error.localizedDescription
+    private func describe(_ error: Error) -> String {
+        if case StealthProfile.ParseError.emptyConfiguration = error {
+            return "The profile is empty or missing an [Interface] section."
         }
-        manager = nil
-        hasProfile = false
-        stats = nil
-        connectedSince = nil
-        lastSample = nil
-        status = .invalid
+        return error.localizedDescription
     }
 }
