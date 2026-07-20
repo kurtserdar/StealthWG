@@ -200,6 +200,31 @@ Adım adım talimatlar için **[INSTALL.md](INSTALL.md)** — iOS/macOS uygulama
 derlenmesi ve bir sunucunun (all-in-one native paket ya da relay) ayağa
 kaldırılması. Derin sunucu referansı: **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
 
+### Hangi kurulum? (mala anlatır gibi)
+
+Önce tek soru: **Sunucunda şu an WireGuard çalışıyor mu?** Hayırsa A veya B, evetse C.
+
+| | **A — Native paket** | **B — Standalone bundle** | **C — Relay image** |
+|---|---|---|---|
+| **Ne zaman?** | Boş Linux, **Docker istemiyorsun** | Boş Linux, **Docker seviyorsun** | Zaten **WireGuard'ın var** |
+| **Ne kurulur?** | Tek program (`stealthwg`) | 2 kutu: WireGuard + maskeleyici | 1 kutu: sadece maskeleyici |
+| **İçinde WG var mı?** | ✅ Var | ✅ Var (ayrı kutuda) | ❌ Yok (seninkini kullanır) |
+| **Motor** | All-in-one | Relay + paketli WG | Relay |
+| **Nasıl?** | `apt install` + `stealthwg init` | `docker compose up -d` | `docker run … stealthwg-gateway` |
+
+- **A — "Tek kutu ver, her şey içinde olsun, Docker'la uğraşmayayım."** Tek program
+  kurarsın, `stealthwg init` dersin, biter. WireGuard **ve** maskeleme o programın
+  içinde.
+- **B — "Boş sunucu ama Docker'ı severim."** `docker compose up` dersin; sana **iki
+  kutu** açar: biri WireGuard, biri önündeki maskeleyici. Sonuç A ile aynı.
+- **C — "Zaten WireGuard'ım var, ona dokunmayayım."** Sadece **maskeleyici kutuyu**
+  kurarsın, "benim WG'm şurada" dersin; önüne geçip maskeler. **Yeni WireGuard
+  kurmaz.**
+
+**Altın kural:** WireGuard'ın **yoksa → A ya da B** (aynı iş, biri Docker'sız biri
+Docker'lı). **Varsa → sadece C** (A/B kurarsan boşuna ikinci bir WireGuard kurarsın).
+Üçünde de hem UDP mask (51819) hem QUIC (443) var.
+
 Uygulama, StealthWG `[Stealth]` bölümü (`MaskKey` ve opsiyonel yedek `Endpoints`)
 olan standart bir wg-quick config'i içe aktarır:
 
