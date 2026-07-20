@@ -21,6 +21,8 @@ struct TunnelProfile: Identifiable, Equatable {
     var onDemand: Bool = false      // manager.isOnDemandEnabled (always-on)
     var killSwitch: Bool = false    // protocol.includeAllNetworks (full tunnel)
     var allowLocal: Bool = false    // protocol.excludeLocalNetworks (LAN reachable)
+    var trustedSSIDs: [String] = [] // Wi-Fi SSIDs where on-demand should not auto-connect
+    var trustCellular: Bool = false // when true, don't auto-connect on cellular
 }
 
 /// Observable multi-profile wrapper the UI binds to. Each profile is a separate
@@ -87,7 +89,9 @@ final class TunnelManager: ObservableObject {
                 id: id, name: m.localizedDescription ?? "StealthWG", profile: parsed,
                 onDemand: m.isOnDemandEnabled,
                 killSwitch: proto.includeAllNetworks,
-                allowLocal: proto.excludeLocalNetworks
+                allowLocal: proto.excludeLocalNetworks,
+                trustedSSIDs: proto.providerConfiguration?["trustedSSIDs"] as? [String] ?? [],
+                trustCellular: proto.providerConfiguration?["trustCellular"] as? Bool ?? false
             ))
             observe(id: id, connection: m.connection)
         }
@@ -157,6 +161,11 @@ final class TunnelManager: ObservableObject {
         if profile.transport != StealthProfile.defaultTransport { pc["transport"] = profile.transport }
         if let sni = profile.sni { pc["sni"] = sni }
         pc["loggingEnabled"] = loggingEnabled
+        // Preserve trusted-network settings across a profile edit.
+        if let ex = existing?.providerConfiguration {
+            if let ssids = ex["trustedSSIDs"] as? [String] { pc["trustedSSIDs"] = ssids }
+            if let cell = ex["trustCellular"] as? Bool { pc["trustCellular"] = cell }
+        }
         proto.providerConfiguration = pc
         proto.includeAllNetworks = existing?.includeAllNetworks ?? false
         proto.excludeLocalNetworks = existing?.excludeLocalNetworks ?? false
@@ -215,9 +224,8 @@ final class TunnelManager: ObservableObject {
                     other.isOnDemandEnabled = false
                     try await other.saveToPreferences()
                 }
-                let rule = NEOnDemandRuleConnect()
-                rule.interfaceTypeMatch = .any
-                m.onDemandRules = [rule]
+                let (ssids, cellular) = trustedNetworks(of: m)
+                m.onDemandRules = makeOnDemandRules(onDemandRuleSpecs(trustedSSIDs: ssids, trustCellular: cellular))
                 m.isOnDemandEnabled = true
             } else {
                 m.isOnDemandEnabled = false
@@ -228,6 +236,52 @@ final class TunnelManager: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Persists the trusted Wi-Fi SSIDs + cellular preference and, when on-demand is
+    /// enabled, rebuilds the rules so they take effect immediately.
+    func setTrustedNetworks(id: String, ssids: [String], trustCellular: Bool) async {
+        guard let m = managers[id], let proto = m.protocolConfiguration as? NETunnelProviderProtocol else { return }
+        var pc = proto.providerConfiguration ?? [:]
+        pc["trustedSSIDs"] = ssids
+        pc["trustCellular"] = trustCellular
+        proto.providerConfiguration = pc
+        m.protocolConfiguration = proto
+        if m.isOnDemandEnabled {
+            m.onDemandRules = makeOnDemandRules(onDemandRuleSpecs(trustedSSIDs: ssids, trustCellular: trustCellular))
+        }
+        m.isEnabled = true
+        do {
+            try await m.saveToPreferences()
+            await reloadAndSelect(preferID: id)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    /// Maps pure rule specs to NEOnDemandRule objects.
+    private func makeOnDemandRules(_ specs: [OnDemandRuleSpec]) -> [NEOnDemandRule] {
+        specs.map { spec in
+            let rule: NEOnDemandRule
+            switch spec.action {
+            case .connect: rule = NEOnDemandRuleConnect()
+            case .ignore: rule = NEOnDemandRuleIgnore()
+            case .disconnect: rule = NEOnDemandRuleDisconnect()
+            }
+            switch spec.interface {
+            case .any: rule.interfaceTypeMatch = .any
+            case .wifi: rule.interfaceTypeMatch = .wiFi
+            case .cellular: rule.interfaceTypeMatch = .cellular
+            }
+            if !spec.ssids.isEmpty { rule.ssidMatch = spec.ssids }
+            return rule
+        }
+    }
+
+    /// Reads a manager's persisted trusted networks from providerConfiguration.
+    private func trustedNetworks(of m: NETunnelProviderManager) -> (ssids: [String], cellular: Bool) {
+        let pc = (m.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
+        return (pc?["trustedSSIDs"] as? [String] ?? [], pc?["trustCellular"] as? Bool ?? false)
     }
 
     func setKillSwitch(id: String, enabled: Bool) async {
