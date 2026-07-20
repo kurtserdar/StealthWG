@@ -2,7 +2,7 @@ module github.com/kurtserdar/StealthWG/gateway
 
 go 1.25.0
 
-require golang.org/x/crypto v0.54.0 // indirect
+require golang.org/x/crypto v0.54.0
 
 require (
 	github.com/kurtserdar/StealthWG/mask v0.0.0
@@ -10,3 +10,5 @@ require (
 )
 
 replace github.com/kurtserdar/StealthWG/mask => ../mask
+
+replace github.com/kurtserdar/StealthWG/wgbind => ../wgbind
