@@ -48,9 +48,12 @@ blocks plain WireGuard on every port.
   traffic (no leaks), and keep the LAN reachable.
 - **Easy import/export** — paste, scan a QR, import a `.conf`, or build from
   scratch; export any profile as a QR.
-- **Self-hostable server, two shapes** — an **all-in-one** masked WireGuard server
-  (one native binary; `apt install` + `stealthwg init`) or a **relay** that masks
-  in front of an existing WireGuard (Docker / RouterOS / Kubernetes).
+- **Self-hostable server, two engines** — **all-in-one** (WireGuard + masking in
+  one binary; for a fresh host) or **relay** (masks in front of an *existing*
+  WireGuard). Three installs by situation: **fresh host, no Docker** → native
+  all-in-one package; **fresh host, with Docker** → standalone bundle; **already
+  run WireGuard** → relay image (RouterOS / Kubernetes). See
+  **[INSTALL.md](INSTALL.md)** for “which one?”.
 - **Privacy by design** — no logging of user traffic; keys never leave the device;
   masking is fingerprint-breaking only, not a second crypto layer.
 
@@ -165,9 +168,12 @@ sıkışmayı tamamladı ve canlı trafik (internet ve LAN) taşıdı.
   trafiği tünelden geçir (sızıntısız), yerel ağ erişimini koru.
 - **Kolay içe/dışa aktarma** — yapıştır, QR tara, `.conf` içe aktar veya sıfırdan
   oluştur; herhangi bir profili QR olarak dışa aktar.
-- **Kendi sunucun, iki biçim** — **all-in-one** maskeli WireGuard sunucusu (tek
-  native binary; `apt install` + `stealthwg init`) ya da mevcut WireGuard'ın önüne
-  maske koyan bir **relay** (Docker / RouterOS / Kubernetes).
+- **Kendi sunucun, iki motor** — **all-in-one** (WireGuard + maskeleme tek
+  binary'de; temiz bir sunucu için) ya da **relay** (*mevcut* bir WireGuard'ın
+  önünde maskeler). Duruma göre üç kurulum: **temiz sunucu, Docker yok** → native
+  all-in-one paket; **temiz sunucu, Docker var** → standalone bundle; **zaten
+  WireGuard çalıştırıyorsun** → relay image (RouterOS / Kubernetes). "Hangisi?"
+  için **[INSTALL.md](INSTALL.md)**.
 - **Tasarımdan gizlilik** — kullanıcı trafiği loglanmaz; anahtarlar cihazdan çıkmaz;
   maskeleme yalnızca parmak izini bozar, ikinci bir şifreleme katmanı değildir.
 

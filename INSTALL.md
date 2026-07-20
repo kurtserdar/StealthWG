@@ -3,8 +3,14 @@
 StealthWG has two parts:
 
 - **The app** — a WireGuard client for **iOS and macOS** that masks its traffic.
-- **The server** — either an **all-in-one masked WireGuard server** (one native
-  binary) or the **relay** (masking in front of an existing WireGuard).
+- **The server** — one of **two engines**, depending on whether you already run
+  WireGuard:
+  - **All-in-one** (`stealthwg`) — WireGuard **and** masking in one binary. It
+    terminates the tunnel itself, so it needs no other WireGuard. Best for a
+    fresh host.
+  - **Relay** (`stealthwg-gateway`) — masking **in front of an existing
+    WireGuard**. It unmasks client traffic and forwards plain WireGuard to your
+    upstream, which it never modifies.
 
 You need one server and at least one app. This guide covers both.
 
@@ -80,10 +86,33 @@ your server). Multiple profiles are supported; per-profile options include
 
 ## 2. The server
 
-### Option A — All-in-one masked WireGuard server (recommended for a fresh host)
+### Which install do I choose?
+
+Pick **one** row. All three speak the same client profile and support both
+transports (UDP mask on 51819 + QUIC on 443).
+
+| Your situation | Use | What runs | Delivery |
+|---|---|---|---|
+| Fresh Linux host, **no** WireGuard, no Docker | **A. All-in-one native package** | one `stealthwg` binary (embeds WireGuard) | `apt/dnf/apk install` + systemd |
+| Fresh host, **no** WireGuard, but you like **Docker** | **B. Standalone bundle** | relay container **+** a bundled WireGuard container | `docker compose up` |
+| You **already** run WireGuard (kernel WG, MikroTik, wg-easy, K8s…) | **C. Relay image** | one relay container in front of your WireGuard | Docker image |
+
+Rules of thumb:
+
+- **No WireGuard yet?** → A (native) or B (Docker). Same result, different taste.
+- **Already have WireGuard?** → C only. Don't run A/B — they'd stand up a *second*
+  WireGuard you don't need.
+- A is the simplest single-box install; it uses **userspace** WireGuard
+  (`wireguard-go`), so it needs no kernel module. B bundles a kernel-WireGuard
+  container (host needs Linux 5.6+). C carries no WireGuard at all — it just
+  forwards to the WireGuard you already run (kernel, MikroTik, wg-easy… anywhere).
+
+---
+
+### Option A — All-in-one native package (fresh host, no Docker)
 
 One self-contained binary that terminates a masked WireGuard tunnel (embedded
-wireguard-go + masking) — no `wireguard-tools` needed.
+wireguard-go + masking) — no `wireguard-tools`, no Docker, no existing WireGuard.
 
 Build the packages from source (or download release files):
 
@@ -126,11 +155,35 @@ sudo stealthwg init --public-host <ip-or-dns> --transport quic --sni www.cloudfl
 The printed client profile then carries `[Stealth] Transport = quic` and `SNI`,
 so the app dials it over QUIC automatically.
 
-### Option B — Relay (front an existing WireGuard)
+### Option B — Standalone Docker bundle (fresh host, with Docker)
 
-If you already run WireGuard (kernel WG, MikroTik/RouterOS, wg-easy…), the relay
-masks in front of it without changing it. Client traffic hits the relay on
-`:51819`; it unmasks and forwards plain WireGuard to your upstream.
+Same "no existing WireGuard" case as Option A, but for Docker hosts. The
+`deploy/standalone/` compose bundle brings up **two** containers — a bundled
+WireGuard server plus the masking relay in front of it — and prints a client
+profile (with QR).
+
+```sh
+cd deploy/standalone
+cp .env.example .env      # set PUBLIC_HOST (your public IP/DNS)
+docker compose up -d
+docker compose logs wg    # scan the printed QR / copy the profile
+```
+
+The gateway container exposes the UDP mask on 51819 and QUIC on 443. The host
+needs kernel WireGuard (Linux 5.6+). Full reference (env vars, RouterOS
+container): **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
+
+> Choosing between A and B? Both stand up a fresh masked WireGuard. **A** is a
+> single native binary (userspace WG, no Docker, no kernel module). **B** is
+> Docker/compose (two containers, uses the host's kernel WireGuard). Same client
+> profile either way.
+
+### Option C — Relay image (you already run WireGuard)
+
+If you already run WireGuard (kernel WG, MikroTik/RouterOS, wg-easy, Kubernetes…),
+run **only** the relay in front of it — do not start a second WireGuard. Client
+traffic hits the relay on `:51819`; it unmasks and forwards plain WireGuard to
+your upstream, which it never modifies.
 
 Container image (`ghcr.io/kurtserdar/stealthwg-gateway`, multi-arch):
 
@@ -149,13 +202,9 @@ To also accept **QUIC** clients on UDP 443, add `-p 443:443/udp` and
 `-e STEALTHWG_QUIC=:443`; the relay then runs the QUIC listener alongside the
 mask listener, both forwarding to the same upstream WireGuard.
 
-- **No WireGuard yet, but want Docker?** The `deploy/standalone/` compose bundle
-  runs the relay **and** a bundled WireGuard server and prints a client profile.
-- **RouterOS / MikroTik (e.g. RB5009), Kubernetes, other container hosts?** Use the
-  container image.
-
-Full server reference (env vars, standalone bundle, RouterOS container, UDP-443
-fallback): **[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
+RouterOS / MikroTik (e.g. RB5009), Kubernetes and other container-host recipes,
+plus the full env-var reference, are in
+**[docs/deploy-gateway.md](docs/deploy-gateway.md)**.
 
 ---
 
