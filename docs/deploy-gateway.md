@@ -1,6 +1,49 @@
 # Deploying the StealthWG gateway
 
-The gateway is a single static binary shipped as a multi-arch container image
+StealthWG ships in two shapes:
+
+- **All-in-one server** (`stealthwg`) — a single self-contained binary that **is**
+  a masked WireGuard server (embedded wireguard-go + UdpMask). Best for a fresh
+  Linux host: `apt install` then one `stealthwg init`. See "Native install" below.
+- **Relay** (`stealthwg-gateway`) — unmasks and forwards to an **unmodified**
+  upstream WireGuard (kernel WG, MikroTik, wg-easy…). Best when you already run
+  WireGuard, or on container platforms (RouterOS/RB5009, k8s). See the rest of
+  this doc.
+
+## Native install (all-in-one masked WireGuard server)
+
+Download the package for your distro from the releases (or build with
+`scripts/build-packages.sh`), then:
+
+```sh
+# Debian / Ubuntu
+sudo apt install ./stealthwg_0.1.0_amd64.deb
+# Fedora / RHEL / Rocky / Alma
+sudo dnf install ./stealthwg-0.1.0-1.x86_64.rpm
+# Alpine
+sudo apk add --allow-untrusted stealthwg_0.1.0_x86_64.apk
+
+# Bring up a complete masked WireGuard server (generates keys + PSK, NAT, service):
+sudo stealthwg init --public-host <your-public-ip-or-dns>
+
+# It prints a client profile (with a QR) — paste it into the StealthWG app.
+# Add more devices:
+sudo stealthwg add-client laptop
+```
+
+WireGuard is embedded (no `wireguard-tools` needed); the package only recommends
+`iproute2` / `iptables` for the interface + NAT, and `qrencode` for the QR. The
+server runs as the `stealthwg` systemd service. Available as `.deb`, `.rpm`,
+`.apk` for amd64 + arm64; raw binaries for macOS/*BSD in the releases.
+
+Already running WireGuard, or on a container platform? Use the **relay** instead —
+it fronts your existing WireGuard without touching it.
+
+---
+
+## Relay (front an existing WireGuard)
+
+The relay is a single static binary shipped as a multi-arch container image
 (`linux/amd64` + `linux/arm64`, ~3.5 MB):
 
 ```
