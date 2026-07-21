@@ -36,14 +36,17 @@ for target in darwin/amd64 darwin/arm64 freebsd/amd64; do
   build_bin "$os" "$arch" "$DIST/stealthwg-$os-$arch" || echo "   (skipped $target)"
 done
 
-# The Linux CLI client (userspace WireGuard + masking; connects to a server).
-build_client() { # goarch out
-  echo ">> build client linux/$1"
-  ( cd "$ROOT/gateway" && GOOS=linux GOARCH="$1" CGO_ENABLED=0 \
-      go build -trimpath -ldflags "-s -w" -o "$2" ./cmd/stealthwg-client )
+# The CLI client (userspace WireGuard + masking; connects to a server) for Linux and
+# Windows, amd64 + arm64. The Windows exe also needs the matching wintun.dll at
+# runtime — fetch it with scripts/fetch-wintun.sh.
+build_client() { # goos goarch out
+  echo ">> build client $1/$2"
+  ( cd "$ROOT/gateway" && GOOS="$1" GOARCH="$2" CGO_ENABLED=0 \
+      go build -trimpath -ldflags "-s -w" -o "$3" ./cmd/stealthwg-client )
 }
 for arch in amd64 arm64; do
-  build_client "$arch" "$DIST/stealthwg-client-linux-$arch"
+  build_client linux   "$arch" "$DIST/stealthwg-client-linux-$arch"
+  build_client windows "$arch" "$DIST/stealthwg-client-windows-$arch.exe"
 done
 
 echo

@@ -3,20 +3,13 @@
 package wgclient
 
 import (
-	"encoding/base64"
 	"fmt"
-	"net"
 	"os/exec"
 	"strings"
 
-	"github.com/kurtserdar/StealthWG/mask"
-	"github.com/kurtserdar/StealthWG/wgbind"
-	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
-
-const padMax = 32
 
 // Engine runs the client tunnel: wireguard-go through the masking/QUIC bind, plus
 // the interface address and routes.
@@ -88,29 +81,6 @@ func (e *Engine) Down() {
 	}
 }
 
-func buildBind(cfg *ClientConfig) (conn.Bind, error) {
-	if cfg.Transport == "quic" {
-		return wgbind.NewQUIC(cfg.SNI), nil
-	}
-	psk, err := base64.StdEncoding.DecodeString(cfg.MaskKey)
-	if err != nil {
-		return nil, fmt.Errorf("mask key: %w", err)
-	}
-	codec, err := mask.NewCodec(psk, padMax)
-	if err != nil {
-		return nil, fmt.Errorf("codec: %w", err)
-	}
-	return wgbind.New(conn.NewStdNetBind(), codec), nil
-}
-
-func resolveIP(endpoint string) (string, error) {
-	addr, err := net.ResolveUDPAddr("udp", endpoint)
-	if err != nil {
-		return "", err
-	}
-	return addr.IP.String(), nil
-}
-
 // defaultRoute parses `ip route show default` for the gateway and interface.
 func defaultRoute() (gw, iface string) {
 	out, err := exec.Command("ip", "route", "show", "default").Output()
@@ -127,8 +97,4 @@ func defaultRoute() (gw, iface string) {
 		}
 	}
 	return gw, iface
-}
-
-func run(name string, args ...string) error {
-	return exec.Command(name, args...).Run()
 }

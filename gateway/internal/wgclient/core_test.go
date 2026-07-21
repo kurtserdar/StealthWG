@@ -118,3 +118,28 @@ func TestRoutePlanSplitTunnel(t *testing.T) {
 		t.Fatalf("split-tunnel up mismatch:\n got %v\nwant %v", up, want)
 	}
 }
+
+func TestRoutePlanWindowsFullTunnel(t *testing.T) {
+	up, down := RoutePlanWindows([]string{"0.0.0.0/0"}, "203.0.113.9", "192.168.1.1", "12", "wg-stealth")
+	want := [][]string{
+		{"interface", "ipv4", "add", "route", "prefix=203.0.113.9/32", "interface=12", "nexthop=192.168.1.1"},
+		{"interface", "ipv4", "add", "route", "prefix=0.0.0.0/1", "interface=wg-stealth"},
+		{"interface", "ipv4", "add", "route", "prefix=128.0.0.0/1", "interface=wg-stealth"},
+	}
+	if !reflect.DeepEqual(up, want) {
+		t.Fatalf("windows full-tunnel up mismatch:\n got %v\nwant %v", up, want)
+	}
+	if down[0][2] != "delete" || down[len(down)-1][4] != "prefix=203.0.113.9/32" {
+		t.Fatalf("windows down mismatch: %v", down)
+	}
+}
+
+func TestRoutePlanWindowsSplit(t *testing.T) {
+	up, _ := RoutePlanWindows([]string{"10.0.0.0/24"}, "203.0.113.9", "192.168.1.1", "12", "wg-stealth")
+	want := [][]string{
+		{"interface", "ipv4", "add", "route", "prefix=10.0.0.0/24", "interface=wg-stealth"},
+	}
+	if !reflect.DeepEqual(up, want) {
+		t.Fatalf("windows split up mismatch:\n got %v\nwant %v", up, want)
+	}
+}

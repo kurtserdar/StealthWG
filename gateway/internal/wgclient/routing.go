@@ -47,3 +47,46 @@ func RoutePlan(allowedIPs []string, endpointIP, defaultGW, defaultIf, iface stri
 	}
 	return up, down
 }
+
+// RoutePlanWindows is the Windows equivalent of RoutePlan: it returns `netsh`
+// argument lists (executor runs `netsh <args>`). Same full/split logic; the endpoint
+// pin uses the default interface's numeric index (spaces-safe) while the tunnel/split
+// routes use the (space-free) tunnel interface name. IPv4 only in the MVP.
+func RoutePlanWindows(allowedIPs []string, endpointIP, defaultGW, defaultIfIndex, iface string) (up, down [][]string) {
+	full := false
+	var splits []string
+	for _, cidr := range allowedIPs {
+		switch cidr {
+		case "0.0.0.0/0":
+			full = true
+		case "::/0":
+			// IPv6 full-tunnel deferred.
+		default:
+			splits = append(splits, cidr)
+		}
+	}
+
+	add := func(args ...string) { up = append(up, args) }
+	if full {
+		if endpointIP != "" && defaultGW != "" && defaultIfIndex != "" {
+			add("interface", "ipv4", "add", "route", "prefix="+endpointIP+"/32",
+				"interface="+defaultIfIndex, "nexthop="+defaultGW)
+		}
+		add("interface", "ipv4", "add", "route", "prefix=0.0.0.0/1", "interface="+iface)
+		add("interface", "ipv4", "add", "route", "prefix=128.0.0.0/1", "interface="+iface)
+	}
+	for _, cidr := range splits {
+		if strings.Contains(cidr, ":") {
+			continue
+		}
+		add("interface", "ipv4", "add", "route", "prefix="+cidr, "interface="+iface)
+	}
+
+	for i := len(up) - 1; i >= 0; i-- {
+		del := make([]string, len(up[i]))
+		copy(del, up[i])
+		del[2] = "delete" // "add" → "delete"
+		down = append(down, del)
+	}
+	return up, down
+}

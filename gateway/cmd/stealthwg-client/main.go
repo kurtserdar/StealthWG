@@ -1,9 +1,9 @@
-//go:build linux
+//go:build linux || windows
 
-// Command stealthwg-client is the StealthWG Linux client: it connects to a
-// StealthWG server using a client profile (masked or QUIC) and routes traffic per
-// the profile's AllowedIPs. Runs in the foreground; stop it with Ctrl-C or, when
-// started by systemd, `systemctl stop`.
+// Command stealthwg-client is the StealthWG CLI client (Linux + Windows): it
+// connects to a StealthWG server using a client profile (masked or QUIC) and routes
+// traffic per the profile's AllowedIPs. Runs in the foreground; stop it with Ctrl-C
+// (or, when wrapped by systemd/a service, on stop).
 package main
 
 import (
@@ -45,8 +45,8 @@ func cmdUp(args []string) {
 		usage()
 		os.Exit(2)
 	}
-	if os.Geteuid() != 0 {
-		fatal("this needs root (try: sudo stealthwg-client up ...)")
+	if !elevated() {
+		fatal("this needs elevated privileges (Linux: sudo; Windows: run as Administrator)")
 	}
 
 	data, err := os.ReadFile(fs.Arg(0))
