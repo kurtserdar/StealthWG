@@ -36,6 +36,16 @@ for target in darwin/amd64 darwin/arm64 freebsd/amd64; do
   build_bin "$os" "$arch" "$DIST/stealthwg-$os-$arch" || echo "   (skipped $target)"
 done
 
+# The Linux CLI client (userspace WireGuard + masking; connects to a server).
+build_client() { # goarch out
+  echo ">> build client linux/$1"
+  ( cd "$ROOT/gateway" && GOOS=linux GOARCH="$1" CGO_ENABLED=0 \
+      go build -trimpath -ldflags "-s -w" -o "$2" ./cmd/stealthwg-client )
+}
+for arch in amd64 arm64; do
+  build_client "$arch" "$DIST/stealthwg-client-linux-$arch"
+done
+
 echo
 echo "Artifacts in $DIST:"
 ls -1 "$DIST"

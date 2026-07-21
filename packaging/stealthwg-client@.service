@@ -1,0 +1,14 @@
+[Unit]
+Description=StealthWG client (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Reads /etc/stealthwg-client/<name>.conf, e.g. `systemctl start stealthwg-client@home`.
+ExecStart=/usr/bin/stealthwg-client up /etc/stealthwg-client/%i.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
