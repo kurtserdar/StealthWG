@@ -149,10 +149,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func setStopping(_ v: Bool) { widgetLock.lock(); stopping = v; widgetLock.unlock() }
     private func isStopping() -> Bool { widgetLock.lock(); defer { widgetLock.unlock() }; return stopping }
 
-    /// Writes the current state to the app group and reloads the widgets. This runs
-    /// in the extension, so widgets update on connect/disconnect even when the app
-    /// is closed (the app also publishes when it is open).
-    private func publishWidgetSnapshot(state: WidgetSnapshot.State, rxRate: Double = 0, txRate: Double = 0, lastHandshake: Int = 0) {
+    /// Writes the current state to the app group and (by default) reloads the
+    /// widgets. Runs in the extension, so widgets update on connect/disconnect even
+    /// when the app is closed. `reload` is false for the periodic throughput writes
+    /// so they don't burn the scarce WidgetKit reload budget — only real state
+    /// changes reload; the fresh numbers ride along on the next refresh.
+    private func publishWidgetSnapshot(state: WidgetSnapshot.State, rxRate: Double = 0, txRate: Double = 0, lastHandshake: Int = 0, reload: Bool = true) {
         // Once we start tearing down, don't let an in-flight stats update re-write
         // .masked over the .exposed we just published (the stop race).
         if state != .exposed, isStopping() { return }
@@ -175,7 +177,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             break
         }
         WidgetStore.save(snap)
-        WidgetCenter.shared.reloadAllTimelines()
+        if reload { WidgetCenter.shared.reloadAllTimelines() }
     }
 
     /// While connected, refresh the widgets' throughput periodically. Home-screen
@@ -184,7 +186,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private func startWidgetStats() {
         stopWidgetStats()
         let timer = DispatchSource.makeTimerSource(queue: pollQueue)
-        timer.schedule(deadline: .now() + 5, repeating: 15)
+        timer.schedule(deadline: .now() + 5, repeating: 30)
         timer.setEventHandler { [weak self] in self?.updateWidgetStats() }
         widgetTimer = timer
         timer.resume()
@@ -210,7 +212,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 }
             }
             self.lastWidgetSample = (s.rxBytes, s.txBytes, now)
-            self.publishWidgetSnapshot(state: .masked, rxRate: rx, txRate: tx, lastHandshake: s.lastHandshakeSeconds)
+            // Write fresh numbers but DON'T reload — reloading every 15 s would burn
+            // the WidgetKit budget and freeze state updates on the other widgets.
+            self.publishWidgetSnapshot(state: .masked, rxRate: rx, txRate: tx, lastHandshake: s.lastHandshakeSeconds, reload: false)
         }
     }
 
