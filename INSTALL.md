@@ -2,7 +2,8 @@
 
 StealthWG has two parts:
 
-- **The app** — a WireGuard client for **iOS and macOS** that masks its traffic.
+- **The client** — masks your traffic and connects to a server: the **iOS/macOS
+  app**, or the **Linux CLI** (`stealthwg-client`).
 - **The server** — one of **two engines**, depending on whether you already run
   WireGuard:
   - **All-in-one** (`stealthwg`) — WireGuard **and** masking in one binary. It
@@ -84,7 +85,43 @@ your server). Multiple profiles are supported; per-profile options include
 
 ---
 
-## 2. The server
+## 2. The Linux client (CLI)
+
+`stealthwg-client` connects a Linux machine to a StealthWG server using the same
+profile the apps import — masked (UDP mask) or QUIC — and routes traffic per the
+profile's `AllowedIPs` (full-tunnel `0.0.0.0/0` or split-tunnel CIDRs). It runs
+**userspace** WireGuard, so it needs no kernel WireGuard.
+
+Download `stealthwg-client-linux-<arch>` from the
+[latest release](https://github.com/kurtserdar/StealthWG/releases/latest), or build
+from source:
+
+```sh
+cd gateway
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o stealthwg-client ./cmd/stealthwg-client
+```
+
+Save the profile your server printed (e.g. `home.conf`) and bring the tunnel up:
+
+```sh
+sudo ./stealthwg-client up home.conf     # foreground; Ctrl-C to stop
+# options:  --iface wg-stealth   --no-route (test the tunnel without touching routes)
+```
+
+For always-on, use systemd: put the profile at `/etc/stealthwg-client/home.conf`,
+copy `packaging/stealthwg-client@.service` to `/etc/systemd/system/`, then:
+
+```sh
+sudo systemctl enable --now stealthwg-client@home
+```
+
+Needs root (it creates a TUN device and edits routes). MVP limitations: DNS from the
+profile is parsed but **not applied** (set your resolver manually if needed); IPv6
+full-tunnel and multi-endpoint fallback aren't implemented yet.
+
+---
+
+## 3. The server
 
 ### Which install do I choose?
 
