@@ -119,6 +119,31 @@ Needs root (it creates a TUN device and edits routes). MVP limitations: DNS from
 profile is parsed but **not applied** (set your resolver manually if needed); IPv6
 full-tunnel and multi-endpoint fallback aren't implemented yet.
 
+### Windows
+
+The same `stealthwg-client` runs on Windows over **Wintun** (userspace WireGuard).
+Grab `stealthwg-client-windows-<arch>.exe` from the
+[latest release](https://github.com/kurtserdar/StealthWG/releases/latest) (or build
+from source, below), and put the matching-arch **`wintun.dll`** next to the `.exe`
+(fetch both with `./scripts/fetch-wintun.sh`, or download from
+[wintun.net](https://www.wintun.net)).
+
+```powershell
+# From an Administrator PowerShell/Command Prompt, in the folder with the exe + wintun.dll:
+.\stealthwg-client.exe up home.conf     # foreground; Ctrl-C to stop
+```
+
+Build from source (from macOS/Linux, cross-compiling):
+
+```sh
+cd gateway
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o stealthwg-client.exe ./cmd/stealthwg-client
+# (GOARCH=arm64 for Windows on ARM)
+```
+
+Needs **Administrator** (creates the Wintun adapter and edits routes). Same MVP
+limitations as Linux; a Windows Service wrapper and code-signing are follow-ups.
+
 ---
 
 ## 3. The server

@@ -3,7 +3,7 @@
 **English** · [Türkçe](#stealthwg-türkçe)
 
 A **masked WireGuard** for networks that fingerprint and block plain WireGuard via
-DPI (Deep Packet Inspection): a client for **iOS, macOS, and Linux (CLI)**, and a
+DPI (Deep Packet Inspection): a client for **iOS, macOS, Linux, and Windows (CLI)**, and a
 self-hostable **masked WireGuard server**.
 
 StealthWG does **not** reimplement WireGuard. It builds on the official,
@@ -70,8 +70,8 @@ that blocks plain WireGuard on every port.
 The masking lives in one small piece, reused on both ends — exactly the symmetry
 that makes the design simple:
 
-- **Client (iOS / macOS / Linux)** — the app (or the `stealthwg-client` CLI on
-  Linux) runs `wireguard-go`; a `MaskBind` (in `wgbind`) wraps its UDP `conn.Bind`
+- **Client (iOS / macOS / Linux / Windows)** — the app (or the `stealthwg-client` CLI on
+  Linux/Windows) runs `wireguard-go`; a `MaskBind` (in `wgbind`) wraps its UDP `conn.Bind`
   and applies the `mask` codec — sealing outbound, opening inbound — at the socket.
   The masking is pluggable behind a Go `Obfuscator` interface (`Seal`/`Open`).
 - **Server** — either the **all-in-one** `stealthwg` server (embeds the *same*
@@ -142,7 +142,7 @@ Endpoints = <host>:51819, <host>:443
 
 Working masked WireGuard: validated end-to-end (handshake + live traffic) from a
 physical iPhone over a carrier that blocks plain WireGuard, through a self-hosted
-gateway. Clients (iOS/macOS apps + a Linux CLI) and both server shapes are built;
+gateway. Clients (iOS/macOS apps + a Linux/Windows CLI) and both server shapes are built;
 hardening and distribution are ongoing.
 
 ## License
@@ -156,7 +156,7 @@ hardening and distribution are ongoing.
 [English](#stealthwg) · **Türkçe**
 
 DPI (Derin Paket İncelemesi) ile düz WireGuard'ı parmak izinden tanıyıp engelleyen
-ağlar için **maskeli WireGuard**: **iOS, macOS ve Linux (CLI)** için bir istemci ve
+ağlar için **maskeli WireGuard**: **iOS, macOS, Linux ve Windows (CLI)** için bir istemci ve
 kendi sunucunda barındırabileceğin bir **maskeli WireGuard sunucusu**.
 
 StealthWG, WireGuard'ı **yeniden yazmaz**. Resmi, MIT lisanslı WireGuard motorunun
@@ -224,7 +224,7 @@ sıkışmayı tamamladı ve canlı trafik (internet ve LAN) taşıdı.
 Maskeleme, iki uçta da tekrar kullanılan tek bir küçük parçada yaşar — tasarımı
 basit kılan simetri budur:
 
-- **İstemci (iOS / macOS / Linux)** — uygulama (ya da Linux'ta `stealthwg-client`
+- **İstemci (iOS / macOS / Linux / Windows)** — uygulama (ya da Linux/Windows'ta `stealthwg-client`
   CLI'si) `wireguard-go` çalıştırır; bir `MaskBind` (`wgbind` içinde) onun UDP
   `conn.Bind`'ını sarar ve `mask` codec'ini uygular — gideni sealler, geleni açar —
   soket sınırında. Maskeleme, Go `Obfuscator` arayüzünün (`Seal`/`Open`) arkasında
@@ -291,7 +291,7 @@ Endpoints = <host>:51819, <host>:443
 
 Çalışan maskeli WireGuard: fiziksel bir iPhone'dan, düz WireGuard'ı engelleyen bir
 operatör üzerinden, kendi barındırdığımız bir gateway ile uçtan uca (el sıkışma +
-canlı trafik) doğrulandı. İstemciler (iOS/macOS uygulamaları + bir Linux CLI) ve her
+canlı trafik) doğrulandı. İstemciler (iOS/macOS uygulamaları + bir Linux/Windows CLI) ve her
 iki sunucu biçimi inşa edildi; sertleştirme ve dağıtım sürüyor.
 
 ## Lisans
