@@ -5,7 +5,15 @@ import SystemExtensions
 /// requires a signed, notarized app the user approves in System Settings.
 final class SystemExtensionManager: NSObject, ObservableObject, OSSystemExtensionRequestDelegate {
     @Published var statusMessage = ""
+    /// Whether the extension has been activated (persisted so the menu can hide the
+    /// "Enable VPN extension" setup step once it's done).
+    @Published var isActivated = UserDefaults.standard.bool(forKey: "extActivated")
     static let extensionIdentifier = "com.stealthwg.mac.tunnel"
+
+    private func setActivated(_ v: Bool) {
+        isActivated = v
+        UserDefaults.standard.set(v, forKey: "extActivated")
+    }
 
     func activate() {
         let request = OSSystemExtensionRequest.activationRequest(
@@ -27,9 +35,11 @@ final class SystemExtensionManager: NSObject, ObservableObject, OSSystemExtensio
 
     func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
         statusMessage = "Extension ready."
+        setActivated(true)
     }
 
     func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
         statusMessage = "Activation failed: \(error.localizedDescription)"
+        setActivated(false)
     }
 }
