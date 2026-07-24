@@ -76,13 +76,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         _ = wgSetTransport(activeTransport, sni)
 
-        setStopping(false)
         publishWidgetSnapshot(state: .masking)
         adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
             if adapterError == nil {
                 self?.startFallbackPolling()
                 self?.publishWidgetSnapshot(state: .masked)
-                self?.startWidgetStats()
             } else {
                 self?.publishWidgetSnapshot(state: .exposed)
             }
@@ -95,8 +93,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler: @escaping () -> Void
     ) {
         stopFallbackPolling()
-        setStopping(true)
-        stopWidgetStats()
         publishWidgetSnapshot(state: .exposed)
         adapter.stop { _ in
             completionHandler()
@@ -141,23 +137,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     // MARK: - Widget snapshot (keeps widgets fresh without the app)
 
-    private var widgetTimer: DispatchSourceTimer?
-    private var lastWidgetSample: (rx: Int64, tx: Int64, at: Date)?
-    private let widgetLock = NSLock()
-    private var stopping = false
+    private var lastPublishedState: WidgetSnapshot.State?
 
-    private func setStopping(_ v: Bool) { widgetLock.lock(); stopping = v; widgetLock.unlock() }
-    private func isStopping() -> Bool { widgetLock.lock(); defer { widgetLock.unlock() }; return stopping }
-
-    /// Writes the current state to the app group and (by default) reloads the
-    /// widgets. Runs in the extension, so widgets update on connect/disconnect even
-    /// when the app is closed. `reload` is false for the periodic throughput writes
-    /// so they don't burn the scarce WidgetKit reload budget — only real state
-    /// changes reload; the fresh numbers ride along on the next refresh.
-    private func publishWidgetSnapshot(state: WidgetSnapshot.State, rxRate: Double = 0, txRate: Double = 0, lastHandshake: Int = 0, reload: Bool = true) {
-        // Once we start tearing down, don't let an in-flight stats update re-write
-        // .masked over the .exposed we just published (the stop race).
-        if state != .exposed, isStopping() { return }
+    /// Writes the current state to the app group and reloads the widgets — but only
+    /// when the STATE actually changes. WidgetKit's reload budget is small, so we
+    /// reload only on genuine transitions (masking/masked/exposed), never on a tick.
+    /// The widgets show state + a self-updating session timer (no per-second data),
+    /// so no periodic refresh is needed. Runs in the extension, so widgets update on
+    /// connect/disconnect even when the app is closed.
+    private func publishWidgetSnapshot(state: WidgetSnapshot.State) {
         let pc = (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
         var snap = WidgetStore.load()
         snap.state = state
@@ -166,55 +154,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         snap.endpoint = currentActiveEndpoint() ?? snap.endpoint
         switch state {
         case .masked:
-            snap.rxRate = rxRate
-            snap.txRate = txRate
-            snap.lastHandshakeSeconds = lastHandshake
             if snap.connectedSince == nil { snap.connectedSince = Date() }
         case .exposed:
-            snap.rxRate = 0; snap.txRate = 0
-            snap.connectedSince = nil; snap.lastHandshakeSeconds = 0
+            snap.connectedSince = nil
         case .masking:
             break
         }
         WidgetStore.save(snap)
-        if reload { WidgetCenter.shared.reloadAllTimelines() }
-    }
-
-    /// While connected, refresh the widgets' throughput periodically. Home-screen
-    /// widgets are not real-time (iOS throttles refreshes), so this is a best-effort
-    /// cadence, not per-second.
-    private func startWidgetStats() {
-        stopWidgetStats()
-        let timer = DispatchSource.makeTimerSource(queue: pollQueue)
-        timer.schedule(deadline: .now() + 5, repeating: 30)
-        timer.setEventHandler { [weak self] in self?.updateWidgetStats() }
-        widgetTimer = timer
-        timer.resume()
-    }
-
-    private func stopWidgetStats() {
-        widgetTimer?.cancel()
-        widgetTimer = nil
-        lastWidgetSample = nil
-    }
-
-    private func updateWidgetStats() {
-        adapter.getRuntimeConfiguration { [weak self] runtime in
-            guard let self, let runtime else { return }
-            let s = parseRuntimeStats(runtime)
-            var rx = 0.0, tx = 0.0
-            let now = Date()
-            if let last = self.lastWidgetSample {
-                let dt = now.timeIntervalSince(last.at)
-                if dt > 0 {
-                    rx = max(0, Double(s.rxBytes - last.rx) / dt)
-                    tx = max(0, Double(s.txBytes - last.tx) / dt)
-                }
-            }
-            self.lastWidgetSample = (s.rxBytes, s.txBytes, now)
-            // Write fresh numbers but DON'T reload — reloading every 15 s would burn
-            // the WidgetKit budget and freeze state updates on the other widgets.
-            self.publishWidgetSnapshot(state: .masked, rxRate: rx, txRate: tx, lastHandshake: s.lastHandshakeSeconds, reload: false)
+        if state != lastPublishedState {
+            lastPublishedState = state
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 

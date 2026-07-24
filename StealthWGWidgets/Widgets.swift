@@ -83,9 +83,6 @@ struct StatusBoardWidget: Widget {
 
 struct StatusBoardView: View {
     let snap: WidgetSnapshot
-    private func rate(_ b: Double) -> String {
-        b > 1_000_000 ? String(format: "%.1f MB/s", b / 1_000_000) : String(format: "%.0f KB/s", b / 1000)
-    }
     var body: some View {
         let c = WidgetTheme.accent(snap.accentName)
         VStack(alignment: .leading, spacing: 6) {
@@ -96,13 +93,25 @@ struct StatusBoardView: View {
                 Text(snap.statusLabel).font(.system(.caption2, design: .monospaced)).foregroundStyle(c)
                     .padding(.horizontal, 8).padding(.vertical, 3).overlay(Capsule().stroke(c))
             }
-            Text("\(snap.profileName ?? "—") · \((snap.transport ?? "mask").uppercased()) · \(snap.endpoint ?? "—")")
-                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            Text("\(snap.profileName ?? "—") · \((snap.transport ?? "mask").uppercased())")
+                .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            if let ep = snap.endpoint {
+                Text(ep).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
+            }
             Spacer()
-            HStack(spacing: 18) {
-                Label(rate(snap.rxRate), systemImage: "arrow.down").foregroundStyle(c)
-                Label(rate(snap.txRate), systemImage: "arrow.up")
-            }.font(.system(.footnote, design: .monospaced))
+            // A self-updating session timer — WidgetKit renders ticking text without
+            // a reload, so it stays live for free (real-time throughput would burn the
+            // reload budget, so that lives in the app instead).
+            if snap.state == .masked, let since = snap.connectedSince {
+                HStack(spacing: 6) {
+                    Image(systemName: "timer").foregroundStyle(c)
+                    Text(since, style: .timer)
+                        .font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
+                }
+            } else {
+                Text(snap.statusLabel)
+                    .font(.system(.title3, design: .rounded).weight(.semibold)).foregroundStyle(c)
+            }
         }
     }
 }

@@ -338,8 +338,12 @@ final class TunnelManager: ObservableObject {
         publishWidgetSnapshot()
     }
 
-    /// Publishes the current state to the app group so widgets can render it, then
-    /// reloads their timelines. Also records the selected profile for intents.
+    private var lastWidgetState: WidgetSnapshot.State?
+
+    /// Publishes the current state to the app group so widgets can render it, and
+    /// records the selected profile for intents. Reloads the widgets **only when the
+    /// state changes** — WidgetKit's reload budget is small, so reloading on every
+    /// stats tick would exhaust it and freeze the widgets.
     private func publishWidgetSnapshot() {
         let id = connectedID ?? selectedID
         WidgetStore.setSelectedProfileID(id)
@@ -358,13 +362,14 @@ final class TunnelManager: ObservableObject {
             profileName: profile?.name,
             transport: profile?.profile.transport,
             endpoint: stats?.activeEndpoint ?? profile?.profile.endpoints.first,
-            rxRate: stats?.rxRate ?? 0,
-            txRate: stats?.txRate ?? 0,
-            connectedSince: stats?.connectedSince,
+            connectedSince: state == .masked ? connectedSince : nil,
             lastHandshakeSeconds: stats?.lastHandshakeSeconds ?? 0
         )
         WidgetStore.save(snap)
-        WidgetCenter.shared.reloadAllTimelines()
+        if state != lastWidgetState {
+            lastWidgetState = state
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 
     private func startStatsPolling(id: String) {
@@ -477,7 +482,9 @@ final class TunnelManager: ObservableObject {
             activeEndpoint: activeEndpoint, isFallback: isFallback,
             connectedSince: connectedSince
         )
-        publishWidgetSnapshot()
+        // Note: no widget publish here — the stats poll (every 1.5 s) must NOT reload
+        // widgets (it would burn the WidgetKit budget). Widgets are refreshed only on
+        // state changes (handleStatusChange) and on app foreground (load).
     }
 
     private func describe(_ error: Error) -> String {
