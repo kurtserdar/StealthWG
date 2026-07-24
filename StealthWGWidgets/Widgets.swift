@@ -128,54 +128,6 @@ struct ShieldView: View {
     }
 }
 
-// MARK: - Status board (medium)
-
-struct StatusBoardWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "StatusBoardWidget", provider: SnapshotProvider()) { entry in
-            StatusBoardView(snap: entry.snapshot).containerBackground(.black, for: .widget)
-        }
-        .configurationDisplayName("Status board")
-        .description("Live throughput and endpoint.")
-        .supportedFamilies([.systemMedium])
-    }
-}
-
-struct StatusBoardView: View {
-    let snap: WidgetSnapshot
-    var body: some View {
-        let c = WidgetTheme.accent(snap.accentName)
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                GhostMark(color: c).frame(width: 26)
-                Text("StealthWG").font(.system(.subheadline, design: .rounded).weight(.bold)).foregroundStyle(.secondary)
-                Spacer()
-                Text(snap.statusLabel).font(.system(.caption2, design: .monospaced)).foregroundStyle(c)
-                    .padding(.horizontal, 8).padding(.vertical, 3).overlay(Capsule().stroke(c))
-            }
-            Text("\(snap.profileName ?? "—") · \((snap.transport ?? "mask").uppercased())")
-                .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
-            if let ep = snap.endpoint {
-                Text(ep).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
-            // A self-updating session timer — WidgetKit renders ticking text without
-            // a reload, so it stays live for free (real-time throughput would burn the
-            // reload budget, so that lives in the app instead).
-            if snap.state == .masked, let since = snap.connectedSince {
-                HStack(spacing: 6) {
-                    Image(systemName: "timer").foregroundStyle(c)
-                    Text(since, style: .timer)
-                        .font(.system(.title3, design: .rounded).weight(.semibold)).monospacedDigit()
-                }
-            } else {
-                Text(snap.statusLabel)
-                    .font(.system(.title3, design: .rounded).weight(.semibold)).foregroundStyle(c)
-            }
-        }
-    }
-}
-
 // MARK: - Quick connect (small, configurable)
 
 struct QuickConnectConfig: WidgetConfigurationIntent {
