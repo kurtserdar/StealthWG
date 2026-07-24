@@ -35,22 +35,63 @@ enum VPNIntentError: Error, CustomLocalizedStringResourceConvertible {
     }
 }
 
-/// Optimistically writes the intended state to the app group and reloads the
-/// widgets, so the reload WidgetKit runs right after a widget-button tap shows the
-/// new direction immediately (start/stop is async, so the extension confirms the
-/// final .masked/.exposed a moment later).
-private func publishOptimisticSnapshot(_ state: WidgetSnapshot.State, _ m: NETunnelProviderManager) {
+private func statusToState(_ s: NEVPNStatus) -> WidgetSnapshot.State {
+    switch s {
+    case .connected: return .masked
+    case .connecting, .reasserting: return .masking
+    default: return .exposed
+    }
+}
+
+/// Waits until the tunnel reaches its FINAL status (or times out), so the reload
+/// WidgetKit guarantees right after a widget-button tap renders the real settled
+/// state — not a transient "connecting" that would otherwise get stuck until an
+/// unreliable background refresh. This is the one rock-solid update path on iOS:
+/// a tap → one guaranteed reload → we make sure that reload shows the truth.
+private func waitForSettled(_ m: NETunnelProviderManager, connecting: Bool,
+                            timeout: TimeInterval = 10) async -> NEVPNStatus {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        let s = m.connection.status
+        if connecting, s == .connected { return s }
+        if !connecting, s == .disconnected || s == .invalid { return s }
+        try? await Task.sleep(nanoseconds: 250_000_000)
+    }
+    return m.connection.status
+}
+
+/// Writes the settled state to the app group and reloads the widgets from this
+/// (user-initiated, foreground-priority) context — the most reliable moment for a
+/// reload to land. The widgets also read the live status on render, so this is
+/// belt-and-suspenders: either path yields the correct final state.
+private func publishSettled(_ status: NEVPNStatus, _ m: NETunnelProviderManager) {
+    let state = statusToState(status)
     let pc = (m.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
     var snap = WidgetStore.load()
     snap.state = state
-    snap.profileName = (pc?["profileName"] as? String) ?? snap.profileName
+    snap.profileName = m.localizedDescription ?? (pc?["profileName"] as? String) ?? snap.profileName
     snap.transport = (pc?["transport"] as? String) ?? snap.transport ?? "mask"
-    if state == .exposed {
-        snap.rxRate = 0; snap.txRate = 0
-        snap.connectedSince = nil; snap.lastHandshakeSeconds = 0
-    }
+    snap.connectedSince = state == .masked ? m.connection.connectedDate : nil
+    if state == .exposed { snap.rxRate = 0; snap.txRate = 0; snap.lastHandshakeSeconds = 0 }
     WidgetStore.save(snap)
     WidgetCenter.shared.reloadAllTimelines()
+}
+
+/// Starts the tunnel, waits for it to settle, then publishes the real state.
+private func connectAndPublish(_ m: NETunnelProviderManager) async throws {
+    m.isEnabled = true
+    try await m.saveToPreferences()
+    try await m.loadFromPreferences()
+    try (m.connection as? NETunnelProviderSession)?.startTunnel()
+    let status = await waitForSettled(m, connecting: true)
+    publishSettled(status, m)
+}
+
+/// Stops the tunnel, waits for it to settle, then publishes the real state.
+private func disconnectAndPublish(_ m: NETunnelProviderManager) async {
+    m.connection.stopVPNTunnel()
+    let status = await waitForSettled(m, connecting: false)
+    publishSettled(status, m)
 }
 
 /// Loads the target manager: the named profile, else the last-selected one, else the first.
@@ -72,13 +113,7 @@ struct ConnectVPNIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         let m = try await targetManager(profile)
-        m.isEnabled = true
-        try await m.saveToPreferences()
-        try await m.loadFromPreferences()
-        try (m.connection as? NETunnelProviderSession)?.startTunnel()
-        // Show "Masking…" immediately (this widget re-renders when the intent
-        // returns); the extension flips it to .masked once connected.
-        publishOptimisticSnapshot(.masking, m)
+        try await connectAndPublish(m)
         return .result()
     }
 }
@@ -90,8 +125,7 @@ struct DisconnectVPNIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         let m = try await targetManager(profile)
-        m.connection.stopVPNTunnel()
-        publishOptimisticSnapshot(.exposed, m)
+        await disconnectAndPublish(m)
         return .result()
     }
 }
@@ -105,14 +139,9 @@ struct ToggleVPNIntent: AppIntent {
         let m = try await targetManager(profile)
         switch m.connection.status {
         case .connected, .connecting, .reasserting:
-            m.connection.stopVPNTunnel()
-            publishOptimisticSnapshot(.exposed, m)
+            await disconnectAndPublish(m)
         default:
-            m.isEnabled = true
-            try await m.saveToPreferences()
-            try await m.loadFromPreferences()
-            try (m.connection as? NETunnelProviderSession)?.startTunnel()
-            publishOptimisticSnapshot(.masking, m)
+            try await connectAndPublish(m)
         }
         return .result()
     }
@@ -126,14 +155,9 @@ struct SetVPNIntent: SetValueIntent {
     func perform() async throws -> some IntentResult {
         let m = try await targetManager(nil)
         if value {
-            m.isEnabled = true
-            try await m.saveToPreferences()
-            try await m.loadFromPreferences()
-            try (m.connection as? NETunnelProviderSession)?.startTunnel()
-            publishOptimisticSnapshot(.masking, m)
+            try await connectAndPublish(m)
         } else {
-            m.connection.stopVPNTunnel()
-            publishOptimisticSnapshot(.exposed, m)
+            await disconnectAndPublish(m)
         }
         return .result()
     }
