@@ -6,5 +6,11 @@
   <array>
     <string>group.com.stealthwg</string>
   </array>
+  <!-- Lets the widget read the live VPN connection status directly, so it always
+       reflects the real state instead of a pushed snapshot that may not land. -->
+  <key>com.apple.developer.networking.networkextension</key>
+  <array>
+    <string>packet-tunnel-provider</string>
+  </array>
 </dict>
 </plist>
