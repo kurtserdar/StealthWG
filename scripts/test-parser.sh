@@ -19,6 +19,7 @@ swiftc -o "$BIN" \
     "$ROOT/Shared/ConnectionDiagnostics.swift" \
     "$ROOT/Shared/OnDemandRules.swift" \
     "$ROOT/Shared/WidgetSnapshot.swift" \
+    "$ROOT/Shared/TunnelStartFlow.swift" \
     "$ROOT/Tests/StealthProfileTests.swift"
 
 "$BIN"

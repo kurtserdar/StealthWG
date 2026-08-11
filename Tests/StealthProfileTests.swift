@@ -17,7 +17,33 @@ enum StealthProfileTests {
         }
     }
 
-    static func main() {
+    /// Fake configuration handle for the connect-flow tests. `systemIsEnabled`
+    /// simulates the system-side state a reload() would reveal (e.g. iOS silently
+    /// disabled the configuration while the app's cached copy still says enabled).
+    final class FakeTunnelConfig: TunnelConfigurationHandle {
+        var isEnabled: Bool
+        var systemIsEnabled: Bool?
+        var reloadError: Error?
+        var events: [String] = []
+
+        init(isEnabled: Bool) { self.isEnabled = isEnabled }
+
+        func reload() async throws {
+            events.append("reload")
+            if let e = reloadError { throw e }
+            if let sys = systemIsEnabled { isEnabled = sys; systemIsEnabled = nil }
+        }
+        func persist() async throws {
+            events.append("persist")
+        }
+        func start() throws {
+            events.append("start")
+        }
+    }
+
+    struct TestError: Error {}
+
+    static func main() async {
         let full = """
         [Interface]
         PrivateKey = aaaa
@@ -327,6 +353,31 @@ enum StealthProfileTests {
         let snap = WidgetSnapshot(state: .masked, profileName: "Home", transport: "quic", endpoint: "gw:443", rxRate: 1200, txRate: 340, connectedSince: nil, lastHandshakeSeconds: 8)
         let round = try! JSONDecoder().decode(WidgetSnapshot.self, from: try! JSONEncoder().encode(snap))
         check(round == snap, "snapshot Codable round-trips")
+
+        // Connect flow: a disabled configuration must be re-enabled (and persisted)
+        // before start, otherwise startVPNTunnel fails with NEVPNErrorDomain 2.
+        let enabled = FakeTunnelConfig(isEnabled: true)
+        try? await startTunnelEnsuringEnabled(enabled)
+        check(enabled.events == ["reload", "start"], "enabled config: reload then start, no persist")
+
+        let staleDisabled = FakeTunnelConfig(isEnabled: true)
+        staleDisabled.systemIsEnabled = false   // system disabled it behind our back
+        try? await startTunnelEnsuringEnabled(staleDisabled)
+        check(staleDisabled.events == ["reload", "persist", "reload", "start"],
+              "stale-disabled config: re-enable + persist + reload before start")
+        check(staleDisabled.isEnabled, "stale-disabled config ends up enabled")
+
+        let freshDisabled = FakeTunnelConfig(isEnabled: false)
+        try? await startTunnelEnsuringEnabled(freshDisabled)
+        check(freshDisabled.events == ["reload", "persist", "reload", "start"],
+              "disabled config: re-enable + persist + reload before start")
+
+        let failing = FakeTunnelConfig(isEnabled: false)
+        failing.reloadError = TestError()
+        var thrown = false
+        do { try await startTunnelEnsuringEnabled(failing) } catch { thrown = true }
+        check(thrown, "reload error propagates")
+        check(!failing.events.contains("start"), "no start after reload error")
 
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         exit(failures == 0 ? 0 : 1)

@@ -205,12 +205,15 @@ final class TunnelManager: ObservableObject {
     // MARK: - Connect
 
     func connect(id: String) {
+        guard let m = managers[id] else { return }
         if let other = connectedID, other != id { managers[other]?.connection.stopVPNTunnel() }
-        do {
-            try managers[id]?.connection.startVPNTunnel()
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        Task {
+            do {
+                try await startTunnelEnsuringEnabled(m)
+                lastError = nil
+            } catch {
+                lastError = error.localizedDescription
+            }
         }
     }
 
@@ -493,4 +496,15 @@ final class TunnelManager: ObservableObject {
         }
         return error.localizedDescription
     }
+}
+
+/// iOS silently disables a VPN configuration when another one is enabled
+/// (another VPN app, or a Settings change), and the app's cached manager keeps
+/// reporting the stale enabled state — startVPNTunnel then fails with
+/// NEVPNErrorDomain error 2. The connect flow reloads and re-enables via this
+/// conformance before starting.
+extension NETunnelProviderManager: TunnelConfigurationHandle {
+    func reload() async throws { try await loadFromPreferences() }
+    func persist() async throws { try await saveToPreferences() }
+    func start() throws { try connection.startVPNTunnel() }
 }
