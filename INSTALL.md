@@ -202,10 +202,15 @@ go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 VERSION=0.2.0 ./scripts/build-packages.sh   # → dist/*.deb *.rpm *.apk (+ raw binaries)
 ```
 
-Install and initialise:
+Install and initialise (download into `/tmp`: apt reads package files as the
+unprivileged `_apt` user, which can't enter a `0700` home directory — a .deb
+there still installs fine but prints a harmless "Download is performed
+unsandboxed as root" notice):
 
 ```sh
+cd /tmp
 # Debian / Ubuntu
+wget https://github.com/kurtserdar/StealthWG/releases/latest/download/stealthwg_0.2.0_amd64.deb
 sudo apt install ./stealthwg_0.2.0_amd64.deb
 # Fedora / RHEL / Rocky / Alma
 sudo dnf install ./stealthwg-0.2.0-1.x86_64.rpm
