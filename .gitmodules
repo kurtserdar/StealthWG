@@ -1,3 +1,4 @@
 [submodule "ThirdParty/wireguard-apple"]
 	path = ThirdParty/wireguard-apple
-	url = https://github.com/WireGuard/wireguard-apple.git
+	url = https://github.com/kurtserdar/wireguard-apple.git
+	branch = stealthwg
