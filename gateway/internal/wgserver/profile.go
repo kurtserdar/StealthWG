@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// AddClient generates a keypair for a new client, appends it to the config, and
+// returns the profile to import on the device. The caller persists the config.
+func (c *Config) AddClient(name string) (string, error) {
+	priv, pub, err := GenerateKeypair()
+	if err != nil {
+		return "", err
+	}
+	addr, err := c.NextClientAddress()
+	if err != nil {
+		return "", err
+	}
+	c.Clients = append(c.Clients, Client{Name: name, PublicKey: pub, Address: addr})
+	return c.ClientProfile(priv, addr), nil
+}
+
 // ClientProfile builds the StealthWG client .conf that the app imports: standard
 // wg-quick config with the server as the peer, plus a [Stealth] MaskKey section.
 func (c *Config) ClientProfile(clientPrivateKey, address string) string {

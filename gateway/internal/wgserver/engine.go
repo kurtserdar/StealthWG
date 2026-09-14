@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	ifaceName = "wg-stealth"
+	// IfaceName is the tunnel interface the server creates; the CLI references
+	// it in firewall guidance.
+	IfaceName = "wg-stealth"
 	ifaceMTU  = 1420
 	padMax    = 32
 )
@@ -35,7 +37,7 @@ func (e *Engine) Start(cfg *Config) error {
 		return err
 	}
 
-	tunDev, err := tun.CreateTUN(ifaceName, ifaceMTU)
+	tunDev, err := tun.CreateTUN(IfaceName, ifaceMTU)
 	if err != nil {
 		return fmt.Errorf("create tun: %w", err)
 	}
@@ -101,10 +103,10 @@ func (e *Engine) applyNetworking() error {
 	if base == "" {
 		return fmt.Errorf("invalid subnet %q", e.subnet)
 	}
-	if err := run("ip", "address", "add", base+".1/24", "dev", ifaceName); err != nil {
+	if err := run("ip", "address", "add", base+".1/24", "dev", IfaceName); err != nil {
 		return fmt.Errorf("set address: %w", err)
 	}
-	if err := run("ip", "link", "set", "up", "dev", ifaceName); err != nil {
+	if err := run("ip", "link", "set", "up", "dev", IfaceName); err != nil {
 		return fmt.Errorf("link up: %w", err)
 	}
 	_ = run("sysctl", "-w", "net.ipv4.ip_forward=1")

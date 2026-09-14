@@ -110,3 +110,33 @@ func mustPub(t *testing.T) string {
 	}
 	return p
 }
+
+func TestAddClientAppendsAndReturnsMatchingProfile(t *testing.T) {
+	c := &Config{PrivateKey: mustPriv(t), MaskKey: "PSKVALUE", ListenPort: 51820,
+		Subnet: "10.8.0.0/24", PublicHost: "vpn.example.com", DNS: "1.1.1.1"}
+	profile, err := c.AddClient("phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Clients) != 1 || c.Clients[0].Name != "phone" || c.Clients[0].Address != "10.8.0.2/32" {
+		t.Fatalf("client not appended: %+v", c.Clients)
+	}
+	// The private key in the returned profile must derive the stored public key.
+	var clientPriv string
+	for _, line := range strings.Split(profile, "\n") {
+		if strings.HasPrefix(line, "PrivateKey = ") {
+			clientPriv = strings.TrimPrefix(line, "PrivateKey = ")
+			break
+		}
+	}
+	pub, err := PublicKeyFromPrivate(clientPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pub != c.Clients[0].PublicKey {
+		t.Fatalf("profile key %q does not match stored public key %q", pub, c.Clients[0].PublicKey)
+	}
+	if !strings.Contains(profile, "Address = 10.8.0.2/32") || !strings.Contains(profile, "MaskKey = PSKVALUE") {
+		t.Fatalf("profile incomplete:\n%s", profile)
+	}
+}

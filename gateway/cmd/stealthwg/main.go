@@ -129,13 +129,20 @@ func cmdInit(args []string) {
 		Subnet: *subnet, PublicHost: ph, DNS: *dns,
 		Transport: *transport, SNI: *sni,
 	}
+	// Write the complete config (server + first client) before starting the
+	// service, so the daemon never loads a client-less snapshot.
+	profile, err := cfg.AddClient("client1")
+	if err != nil {
+		fatal("add client: %v", err)
+	}
 	if err := saveConfig(cfg); err != nil {
 		fatal("save config: %v", err)
 	}
 	if !noSystemd() {
 		_ = exec.Command("systemctl", "enable", "--now", "stealthwg").Run()
 	}
-	addClient(cfg, "client1")
+	printProfile("client1", cfg.Clients[len(cfg.Clients)-1].Address, profile)
+	fmt.Print(firewallHints(cfg.ListenPort, ufwActive(), firewalldActive()))
 	fmt.Println("\nStealthWG is up. Add more devices with: sudo stealthwg add-client <name>")
 }
 
@@ -148,8 +155,15 @@ func cmdAddClient(args []string) {
 	if err != nil {
 		fatal("load config (run 'stealthwg init' first): %v", err)
 	}
-	addClient(cfg, args[0])
+	profile, err := cfg.AddClient(args[0])
+	if err != nil {
+		fatal("add client: %v", err)
+	}
+	if err := saveConfig(cfg); err != nil {
+		fatal("save config: %v", err)
+	}
 	reloadDaemon()
+	printProfile(args[0], cfg.Clients[len(cfg.Clients)-1].Address, profile)
 }
 
 // noSystemd reports whether the CLI runs without systemd (containers), gated by
@@ -171,20 +185,7 @@ func reloadDaemon() {
 	_ = exec.Command("systemctl", "reload", "stealthwg").Run()
 }
 
-func addClient(cfg *wgserver.Config, name string) {
-	priv, pub, err := wgserver.GenerateKeypair()
-	if err != nil {
-		fatal("keys: %v", err)
-	}
-	addr, err := cfg.NextClientAddress()
-	if err != nil {
-		fatal("allocate address: %v", err)
-	}
-	cfg.Clients = append(cfg.Clients, wgserver.Client{Name: name, PublicKey: pub, Address: addr})
-	if err := saveConfig(cfg); err != nil {
-		fatal("save config: %v", err)
-	}
-	profile := cfg.ClientProfile(priv, addr)
+func printProfile(name, addr, profile string) {
 	fmt.Printf("\n===== StealthWG client profile: %s (%s) =====\n%s\n", name, addr, profile)
 	printQR(profile)
 }
