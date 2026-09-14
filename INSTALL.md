@@ -199,7 +199,7 @@ build from source:
 
 ```sh
 go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-VERSION=0.2.0 ./scripts/build-packages.sh   # → dist/*.deb *.rpm *.apk (+ raw binaries)
+VERSION=0.2.1 ./scripts/build-packages.sh   # → dist/*.deb *.rpm *.apk (+ raw binaries)
 ```
 
 Install and initialise (download into `/tmp`: apt reads package files as the
@@ -210,12 +210,12 @@ unsandboxed as root" notice):
 ```sh
 cd /tmp
 # Debian / Ubuntu
-wget https://github.com/kurtserdar/StealthWG/releases/latest/download/stealthwg_0.2.0_amd64.deb
-sudo apt install ./stealthwg_0.2.0_amd64.deb
+wget https://github.com/kurtserdar/StealthWG/releases/latest/download/stealthwg_0.2.1_amd64.deb
+sudo apt install ./stealthwg_0.2.1_amd64.deb
 # Fedora / RHEL / Rocky / Alma
-sudo dnf install ./stealthwg-0.2.0-1.x86_64.rpm
+sudo dnf install ./stealthwg-0.2.1-1.x86_64.rpm
 # Alpine
-sudo apk add --allow-untrusted ./stealthwg_0.2.0_x86_64.apk
+sudo apk add --allow-untrusted ./stealthwg_0.2.1_x86_64.apk
 
 sudo stealthwg init --public-host <your-public-ip-or-dns>
 ```
