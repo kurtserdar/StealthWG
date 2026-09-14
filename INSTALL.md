@@ -231,6 +231,14 @@ sudo stealthwg add-client laptop
 Point the app's `[Peer] Endpoint` at `<public-host>:51820` (the port `init` uses)
 and forward that UDP port to the host.
 
+> **Firewalls — the two places handshakes silently die:** open the UDP port both
+> in your cloud provider's firewall/security group **and** in the host firewall
+> (`sudo ufw allow 51820/udp`). If the host runs ufw (or Docker), the FORWARD
+> chain's default policy is deny — the handshake will succeed but no traffic
+> flows; also allow routed traffic from the tunnel:
+> `sudo ufw route allow in on wg-stealth`. `tcpdump` seeing inbound packets does
+> **not** mean the server received them — tcpdump captures before the firewall.
+
 To run the server over **QUIC** instead of the UDP mask (blends with HTTP/3 on
 UDP 443):
 
